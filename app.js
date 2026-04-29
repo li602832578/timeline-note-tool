@@ -19,34 +19,18 @@ const elements = {
   note: document.querySelector("#noteInput"),
   submit: document.querySelector("#submitButton"),
   cancel: document.querySelector("#cancelEditButton"),
-  appendLast: document.querySelector("#appendLastButton"),
   list: document.querySelector("#entryList"),
   preview: document.querySelector("#imagePreview"),
   count: document.querySelector("#countLabel"),
   toast: document.querySelector("#statusToast"),
   downloadJpg: document.querySelector("#downloadJpgButton"),
-  downloadMd: document.querySelector("#downloadMdButton"),
   clearAll: document.querySelector("#clearAllButton"),
 };
 
 elements.form.addEventListener("submit", handleSubmit);
 elements.cancel.addEventListener("click", resetForm);
 elements.downloadJpg.addEventListener("click", downloadJpg);
-elements.downloadMd.addEventListener("click", downloadMarkdown);
 elements.clearAll.addEventListener("click", clearAll);
-elements.appendLast.addEventListener("click", () => {
-  elements.time.value = "";
-  elements.appendLast.dataset.active = elements.appendLast.dataset.active === "true" ? "false" : "true";
-  elements.appendLast.classList.toggle("is-active", elements.appendLast.dataset.active === "true");
-  elements.note.focus();
-});
-
-document.querySelectorAll("[data-time]").forEach((button) => {
-  button.addEventListener("click", () => {
-    elements.time.value = button.dataset.time;
-    elements.note.focus();
-  });
-});
 
 render();
 
@@ -61,12 +45,7 @@ function handleSubmit(event) {
     return;
   }
 
-  if (!rawTime && state.entries.length && state.editingId === null && elements.appendLast.dataset.active === "true") {
-    const target = state.entries[state.entries.length - 1];
-    target.note = `${target.note}\n${note}`;
-    target.type = selectedType === "自动识别" ? detectType(target.note, target.timecode) : selectedType;
-    showToast("已补充到上一条修改意见");
-  } else if (state.editingId) {
+  if (state.editingId) {
     const target = state.entries.find((entry) => entry.id === state.editingId);
     if (target) {
       const timecode = normalizeTimeInput(rawTime);
@@ -74,7 +53,7 @@ function handleSubmit(event) {
       target.note = note;
       target.type = selectedType === "自动识别" ? detectType(note, timecode) : selectedType;
       target.sortValue = getSortValue(timecode);
-      showToast("修改已保存");
+      showToast("已保存成功");
     }
   } else {
     const timecode = normalizeTimeInput(rawTime);
@@ -86,7 +65,7 @@ function handleSubmit(event) {
       note,
       sortValue: getSortValue(timecode),
     });
-    showToast("已添加一条修改意见");
+    showToast("已添加成功");
   }
 
   saveEntries();
@@ -261,8 +240,6 @@ function resetForm(options = {}) {
   const { focusTime = true } = options;
   state.editingId = null;
   elements.form.reset();
-  elements.appendLast.dataset.active = "false";
-  elements.appendLast.classList.remove("is-active");
   elements.type.value = "自动识别";
   elements.submit.textContent = "添加一条";
   elements.cancel.hidden = true;
@@ -286,23 +263,6 @@ function showToast(message) {
 
 function isSmallScreen() {
   return window.matchMedia("(max-width: 760px)").matches;
-}
-
-function toMarkdown(entries) {
-  const lines = ["# 视频修改意见", ""];
-  entries.forEach((entry, index) => {
-    lines.push(`## ${String(index + 1).padStart(2, "0")}. ${entry.timecode}`);
-    lines.push(`类型：${entry.type}`);
-    lines.push("");
-    lines.push(`修改意见：==${entry.note}==`);
-    lines.push("");
-  });
-  return lines.join("\n");
-}
-
-function downloadMarkdown() {
-  const markdown = toMarkdown(getSortedEntries());
-  downloadBlob(markdown, `修改意见（可编辑）_${getTimestamp()}.md`, "text/markdown;charset=utf-8");
 }
 
 function downloadJpg() {

@@ -11,52 +11,50 @@
       <header class="topbar">
         <div>
           <h1>视频修改意见生成器</h1>
-          <p>录入时间轴和修改意见，一键生成 JPG 长图与可编辑 Markdown。</p>
+          <p>录入时间轴和修改意见，一键生成 JPG 长图。</p>
         </div>
         <div class="top-actions">
           <button class="button ghost" id="clearAllButton" type="button">清空</button>
-          <button class="button secondary" id="downloadMdButton" type="button">导出 MD</button>
           <button class="button primary" id="downloadJpgButton" type="button">生成 JPG</button>
         </div>
       </header>
 
       <section class="workspace">
         <form class="editor-panel" id="entryForm">
-          <div class="field-row">
-            <label class="field">
-              <span>时间轴</span>
-              <input id="timeInput" autocomplete="off" placeholder="如 0123、01:23、0138-0200" />
-              <small>不填时间轴时，会默认识别为“全片”。</small>
-            </label>
-            <label class="field compact">
-              <span>类型</span>
-              <select id="typeInput">
-                <option value="自动识别">自动识别</option>
-                <option value="删除">删除</option>
-                <option value="花字 / 包装">花字 / 包装</option>
-                <option value="字幕">字幕</option>
-                <option value="素材">素材</option>
-                <option value="画面剪辑">画面剪辑</option>
-                <option value="结构">结构</option>
-                <option value="修改">修改</option>
-              </select>
-            </label>
-          </div>
-
-          <div class="quick-row" aria-label="快捷时间选项">
-            <button type="button" class="chip" id="appendLastButton">补充上一条</button>
-          </div>
-
           <label class="field">
-            <span>修改意见</span>
+            <span>时间轴</span>
+            <input id="timeInput" autocomplete="off" placeholder="如 0123、01:23、0138-0200" />
+            <small>不填时间轴时，会默认识别为“全片”。</small>
+          </label>
+
+          <label class="field note-field">
+            <div class="note-heading">
+              <span>修改意见</span>
+              <div class="note-heading-actions">
+                <div class="status-toast" id="statusToast" role="status" aria-live="polite" hidden></div>
+                <button class="button primary" id="submitButton" type="submit">添加一条</button>
+              </div>
+            </div>
             <textarea id="noteInput" rows="8" placeholder="直接输入修改意见。多行内容会保留换行。"></textarea>
           </label>
 
+          <label class="field">
+            <span>类型</span>
+            <select id="typeInput">
+              <option value="自动识别">自动识别</option>
+              <option value="删除">删除</option>
+              <option value="花字 / 包装">花字 / 包装</option>
+              <option value="字幕">字幕</option>
+              <option value="素材">素材</option>
+              <option value="画面剪辑">画面剪辑</option>
+              <option value="结构">结构</option>
+              <option value="修改">修改</option>
+            </select>
+          </label>
+
           <div class="form-actions">
-            <button class="button primary" id="submitButton" type="submit">添加一条</button>
             <button class="button ghost" id="cancelEditButton" type="button" hidden>取消编辑</button>
           </div>
-          <div class="status-toast" id="statusToast" role="status" aria-live="polite" hidden></div>
         </form>
 
         <section class="list-panel" aria-label="已添加修改意见">

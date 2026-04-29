@@ -69,7 +69,6 @@ h1 {
 
 .top-actions,
 .form-actions,
-.quick-row,
 .entry-actions {
   display: flex;
   align-items: center;
@@ -98,13 +97,6 @@ h1 {
   top: 16px;
 }
 
-.field-row {
-  display: grid;
-  grid-template-columns: 1fr 170px;
-  gap: 12px;
-  align-items: start;
-}
-
 .field {
   display: grid;
   align-content: start;
@@ -114,8 +106,8 @@ h1 {
 
 .field span {
   color: #384050;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 850;
 }
 
 .field small {
@@ -138,8 +130,10 @@ textarea {
 
 input,
 select {
-  height: 44px;
-  padding: 0 12px;
+  height: 58px;
+  padding: 0 16px;
+  font-size: 24px;
+  font-weight: 750;
 }
 
 textarea {
@@ -147,6 +141,8 @@ textarea {
   resize: vertical;
   padding: 12px;
   line-height: 1.55;
+  font-size: 22px;
+  font-weight: 700;
 }
 
 input:focus,
@@ -156,8 +152,7 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
-.button,
-.chip {
+.button {
   border: 0;
   border-radius: 6px;
   min-height: 40px;
@@ -181,47 +176,42 @@ textarea:focus {
   color: #fff;
 }
 
-.button.ghost,
-.chip {
+.button.ghost {
   background: #eef0f4;
   color: #2d3442;
 }
 
-.button.ghost:hover,
-.chip:hover {
+.button.ghost:hover {
   background: #e1e5ec;
 }
 
-.chip.is-active {
-  background: #182033;
-  color: #fff;
+.note-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.quick-row {
-  margin: 0 0 14px;
-}
-
-.chip {
-  min-height: 34px;
-  padding: 0 12px;
-  font-size: 14px;
+.note-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
 }
 
 .status-toast {
-  position: fixed;
-  left: 50%;
-  top: 18px;
-  z-index: 30;
-  width: min(420px, calc(100vw - 32px));
-  transform: translateX(-50%);
+  max-width: 220px;
   border-radius: 6px;
   background: #e8f7ee;
   color: #17623a;
   border: 1px solid #bce7ca;
-  padding: 12px 14px;
+  padding: 8px 10px;
+  font-size: 14px;
+  line-height: 1.2;
   font-weight: 800;
   text-align: center;
-  box-shadow: 0 12px 32px rgba(24, 31, 42, 0.16);
+  white-space: nowrap;
 }
 
 .status-toast[hidden] {
@@ -430,8 +420,7 @@ textarea:focus {
   }
 
   .topbar,
-  .workspace,
-  .field-row {
+  .workspace {
     display: grid;
     grid-template-columns: 1fr;
   }
@@ -458,8 +447,22 @@ textarea:focus {
     padding: 16px;
   }
 
+  .note-heading {
+    align-items: center;
+  }
+
+  .note-heading-actions {
+    gap: 8px;
+  }
+
+  .note-heading-actions .button {
+    min-height: 38px;
+    padding: 0 12px;
+  }
+
   .status-toast {
-    top: calc(12px + env(safe-area-inset-top));
-    width: min(360px, calc(100vw - 24px));
+    max-width: 132px;
+    padding: 7px 8px;
+    font-size: 13px;
   }
 }
