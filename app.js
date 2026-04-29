@@ -31,6 +31,29 @@ elements.form.addEventListener("submit", handleSubmit);
 elements.cancel.addEventListener("click", resetForm);
 elements.downloadJpg.addEventListener("click", downloadJpg);
 elements.clearAll.addEventListener("click", clearAll);
+document.addEventListener(
+  "touchmove",
+  (event) => {
+    if (event.touches && event.touches.length > 1) {
+      event.preventDefault();
+    }
+  },
+  { passive: false },
+);
+document.addEventListener(
+  "gesturestart",
+  (event) => {
+    event.preventDefault();
+  },
+  { passive: false },
+);
+document.addEventListener(
+  "gesturechange",
+  (event) => {
+    event.preventDefault();
+  },
+  { passive: false },
+);
 
 render();
 
@@ -229,11 +252,11 @@ function deleteEntry(id) {
 
 function clearAll() {
   if (!state.entries.length) return;
-  if (!window.confirm("确定清空所有修改意见吗？")) return;
   state.entries = [];
   saveEntries();
   resetForm();
   render();
+  showToast("已清空");
 }
 
 function resetForm(options = {}) {
