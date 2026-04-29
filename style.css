@@ -106,8 +106,8 @@ h1 {
 
 .field span {
   color: #384050;
-  font-size: 24px;
-  font-weight: 850;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .field small {
@@ -130,10 +130,10 @@ textarea {
 
 input,
 select {
-  height: 58px;
-  padding: 0 16px;
-  font-size: 24px;
-  font-weight: 750;
+  height: 44px;
+  padding: 0 12px;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 textarea {
@@ -427,6 +427,17 @@ textarea:focus {
 
   h1 {
     font-size: 27px;
+  }
+
+  .field span {
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  input,
+  select {
+    height: 48px;
+    font-size: 18px;
   }
 
   .top-actions .button {
