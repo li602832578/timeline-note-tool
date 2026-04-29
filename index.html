@@ -57,7 +57,11 @@
 
           <label class="field">
             <span>参考图</span>
-            <input id="referenceImageInput" type="file" accept="image/*" />
+            <div class="file-picker">
+              <label class="file-button" for="referenceImageInput">上传参考图</label>
+              <span id="referenceFileName">未选择图片</span>
+              <input id="referenceImageInput" type="file" accept="image/*" />
+            </div>
           </label>
           <div class="reference-preview" id="referencePreview" hidden>
             <img id="referencePreviewImage" alt="参考图预览" />

@@ -20,6 +20,7 @@ const elements = {
   type: document.querySelector("#typeInput"),
   note: document.querySelector("#noteInput"),
   imageInput: document.querySelector("#referenceImageInput"),
+  imageFileName: document.querySelector("#referenceFileName"),
   imagePreview: document.querySelector("#referencePreview"),
   imagePreviewImg: document.querySelector("#referencePreviewImage"),
   removeImage: document.querySelector("#removeReferenceButton"),
@@ -313,6 +314,7 @@ function resetForm(options = {}) {
 function handleImageUpload(event) {
   const file = event.target.files?.[0];
   if (!file) return;
+  elements.imageFileName.textContent = file.name || "已选择图片";
   const reader = new FileReader();
   reader.onload = () => {
     state.referenceImage = String(reader.result);
@@ -324,6 +326,7 @@ function handleImageUpload(event) {
 function removeReferenceImage() {
   state.referenceImage = null;
   elements.imageInput.value = "";
+  elements.imageFileName.textContent = "未选择图片";
   renderReferencePreview();
 }
 
@@ -335,6 +338,7 @@ function renderReferencePreview() {
   }
   elements.imagePreview.hidden = false;
   elements.imagePreviewImg.src = state.referenceImage;
+  elements.imageFileName.textContent = "已选择图片";
 }
 
 let toastTimer = null;
