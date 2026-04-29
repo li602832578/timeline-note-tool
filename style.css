@@ -102,10 +102,12 @@ h1 {
   display: grid;
   grid-template-columns: 1fr 170px;
   gap: 12px;
+  align-items: start;
 }
 
 .field {
   display: grid;
+  align-content: start;
   gap: 7px;
   margin-bottom: 14px;
 }
@@ -206,13 +208,20 @@ textarea:focus {
 }
 
 .status-toast {
-  margin-top: 14px;
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 30;
+  width: min(420px, calc(100vw - 32px));
+  transform: translateX(-50%);
   border-radius: 6px;
   background: #e8f7ee;
   color: #17623a;
   border: 1px solid #bce7ca;
   padding: 12px 14px;
   font-weight: 800;
+  text-align: center;
+  box-shadow: 0 12px 32px rgba(24, 31, 42, 0.16);
 }
 
 .status-toast[hidden] {
@@ -447,5 +456,10 @@ textarea:focus {
 
   .preview-sheet {
     padding: 16px;
+  }
+
+  .status-toast {
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    width: min(360px, calc(100vw - 24px));
   }
 }

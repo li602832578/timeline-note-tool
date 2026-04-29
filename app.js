@@ -90,7 +90,7 @@ function handleSubmit(event) {
   }
 
   saveEntries();
-  resetForm();
+  resetForm({ focusTime: false });
   render();
 }
 
@@ -257,7 +257,8 @@ function clearAll() {
   render();
 }
 
-function resetForm() {
+function resetForm(options = {}) {
+  const { focusTime = true } = options;
   state.editingId = null;
   elements.form.reset();
   elements.appendLast.dataset.active = "false";
@@ -265,7 +266,11 @@ function resetForm() {
   elements.type.value = "自动识别";
   elements.submit.textContent = "添加一条";
   elements.cancel.hidden = true;
-  elements.time.focus();
+  if (focusTime && !isSmallScreen()) {
+    elements.time.focus();
+  } else if (document.activeElement && typeof document.activeElement.blur === "function") {
+    document.activeElement.blur();
+  }
 }
 
 let toastTimer = null;
@@ -277,6 +282,10 @@ function showToast(message) {
   toastTimer = window.setTimeout(() => {
     elements.toast.hidden = true;
   }, 2200);
+}
+
+function isSmallScreen() {
+  return window.matchMedia("(max-width: 760px)").matches;
 }
 
 function toMarkdown(entries) {
