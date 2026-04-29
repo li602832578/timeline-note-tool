@@ -23,6 +23,7 @@ const elements = {
   list: document.querySelector("#entryList"),
   preview: document.querySelector("#imagePreview"),
   count: document.querySelector("#countLabel"),
+  toast: document.querySelector("#statusToast"),
   downloadJpg: document.querySelector("#downloadJpgButton"),
   downloadMd: document.querySelector("#downloadMdButton"),
   clearAll: document.querySelector("#clearAllButton"),
@@ -35,6 +36,8 @@ elements.downloadMd.addEventListener("click", downloadMarkdown);
 elements.clearAll.addEventListener("click", clearAll);
 elements.appendLast.addEventListener("click", () => {
   elements.time.value = "";
+  elements.appendLast.dataset.active = elements.appendLast.dataset.active === "true" ? "false" : "true";
+  elements.appendLast.classList.toggle("is-active", elements.appendLast.dataset.active === "true");
   elements.note.focus();
 });
 
@@ -58,10 +61,11 @@ function handleSubmit(event) {
     return;
   }
 
-  if (!rawTime && state.entries.length && state.editingId === null) {
+  if (!rawTime && state.entries.length && state.editingId === null && elements.appendLast.dataset.active === "true") {
     const target = state.entries[state.entries.length - 1];
     target.note = `${target.note}\n${note}`;
     target.type = selectedType === "自动识别" ? detectType(target.note, target.timecode) : selectedType;
+    showToast("已补充到上一条修改意见");
   } else if (state.editingId) {
     const target = state.entries.find((entry) => entry.id === state.editingId);
     if (target) {
@@ -70,6 +74,7 @@ function handleSubmit(event) {
       target.note = note;
       target.type = selectedType === "自动识别" ? detectType(note, timecode) : selectedType;
       target.sortValue = getSortValue(timecode);
+      showToast("修改已保存");
     }
   } else {
     const timecode = normalizeTimeInput(rawTime);
@@ -81,6 +86,7 @@ function handleSubmit(event) {
       note,
       sortValue: getSortValue(timecode),
     });
+    showToast("已添加一条修改意见");
   }
 
   saveEntries();
@@ -90,7 +96,7 @@ function handleSubmit(event) {
 
 function normalizeTimeInput(raw) {
   const value = raw.trim();
-  if (!value) return "未指定";
+  if (!value) return "全片";
   if (value === "全片" || value === "未指定") return value;
 
   const rangeMatch = value.match(/^(.+?)\s*(?:-|—|–|到|至|~)\s*(.+)$/);
@@ -194,7 +200,7 @@ function renderPreview(entries) {
   if (!entries.length) {
     elements.preview.innerHTML = `
       <div class="preview-sheet">
-        <div class="preview-title">剪辑时间轴修改意见</div>
+        <div class="preview-title">视频修改意见</div>
         <div class="preview-count">共 0 条</div>
       </div>
     `;
@@ -203,7 +209,7 @@ function renderPreview(entries) {
 
   elements.preview.innerHTML = `
     <div class="preview-sheet" id="previewSheet">
-      <div class="preview-title">剪辑时间轴修改意见</div>
+      <div class="preview-title">视频修改意见</div>
       <div class="preview-count">共 ${entries.length} 条</div>
       ${entries
         .map(
@@ -254,14 +260,27 @@ function clearAll() {
 function resetForm() {
   state.editingId = null;
   elements.form.reset();
+  elements.appendLast.dataset.active = "false";
+  elements.appendLast.classList.remove("is-active");
   elements.type.value = "自动识别";
   elements.submit.textContent = "添加一条";
   elements.cancel.hidden = true;
   elements.time.focus();
 }
 
+let toastTimer = null;
+
+function showToast(message) {
+  elements.toast.textContent = message;
+  elements.toast.hidden = false;
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => {
+    elements.toast.hidden = true;
+  }, 2200);
+}
+
 function toMarkdown(entries) {
-  const lines = ["# 剪辑时间轴修改意见", ""];
+  const lines = ["# 视频修改意见", ""];
   entries.forEach((entry, index) => {
     lines.push(`## ${String(index + 1).padStart(2, "0")}. ${entry.timecode}`);
     lines.push(`类型：${entry.type}`);
@@ -281,7 +300,7 @@ function downloadJpg() {
   const entries = getSortedEntries();
   if (!entries.length) return;
   const canvas = createImageCanvas(entries);
-  const filename = `剪辑时间轴修改意见_${getTimestamp()}.jpg`;
+  const filename = `修改意见_${getDateStamp()}.jpg`;
   if (canvas.toBlob) {
     canvas.toBlob(
       (blob) => {
@@ -336,7 +355,7 @@ function createImageCanvas(entries) {
 
   ctx.fillStyle = "#181f2a";
   ctx.font = fonts.title;
-  ctx.fillText("剪辑时间轴修改意见", margin, 96);
+  ctx.fillText("视频修改意见", margin, 96);
   ctx.fillStyle = "#5c6370";
   ctx.font = fonts.small;
   ctx.fillText(`共 ${entries.length} 条`, margin, 146);
@@ -451,6 +470,12 @@ function getTimestamp() {
   const now = new Date();
   const pad = (value) => String(value).padStart(2, "0");
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+
+function getDateStamp() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
 }
 
 function escapeHtml(value) {

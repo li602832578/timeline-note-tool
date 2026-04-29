@@ -116,6 +116,12 @@ h1 {
   font-weight: 700;
 }
 
+.field small {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 input,
 select,
 textarea {
@@ -184,6 +190,11 @@ textarea:focus {
   background: #e1e5ec;
 }
 
+.chip.is-active {
+  background: #182033;
+  color: #fff;
+}
+
 .quick-row {
   margin: 0 0 14px;
 }
@@ -192,6 +203,20 @@ textarea:focus {
   min-height: 34px;
   padding: 0 12px;
   font-size: 14px;
+}
+
+.status-toast {
+  margin-top: 14px;
+  border-radius: 6px;
+  background: #e8f7ee;
+  color: #17623a;
+  border: 1px solid #bce7ca;
+  padding: 12px 14px;
+  font-weight: 800;
+}
+
+.status-toast[hidden] {
+  display: none;
 }
 
 .panel-heading {

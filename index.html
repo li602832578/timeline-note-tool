@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>剪辑时间轴修改意见生成器</title>
+    <title>视频修改意见生成器</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="topbar">
         <div>
-          <h1>剪辑时间轴修改意见生成器</h1>
+          <h1>视频修改意见生成器</h1>
           <p>录入时间轴和修改意见，一键生成 JPG 长图与可编辑 Markdown。</p>
         </div>
         <div class="top-actions">
@@ -26,6 +26,7 @@
             <label class="field">
               <span>时间轴</span>
               <input id="timeInput" autocomplete="off" placeholder="如 0123、01:23、0138-0200" />
+              <small>不填时间轴时，会默认识别为“全片”。</small>
             </label>
             <label class="field compact">
               <span>类型</span>
@@ -43,8 +44,6 @@
           </div>
 
           <div class="quick-row" aria-label="快捷时间选项">
-            <button type="button" class="chip" data-time="全片">全片</button>
-            <button type="button" class="chip" data-time="未指定">未指定</button>
             <button type="button" class="chip" id="appendLastButton">补充上一条</button>
           </div>
 
@@ -57,6 +56,7 @@
             <button class="button primary" id="submitButton" type="submit">添加一条</button>
             <button class="button ghost" id="cancelEditButton" type="button" hidden>取消编辑</button>
           </div>
+          <div class="status-toast" id="statusToast" role="status" aria-live="polite" hidden></div>
         </form>
 
         <section class="list-panel" aria-label="已添加修改意见">
