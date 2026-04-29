@@ -1,6 +1,7 @@
 const state = {
   entries: loadEntries(),
   editingId: null,
+  referenceImage: null,
 };
 
 const typeRules = [
@@ -8,6 +9,7 @@ const typeRules = [
   ["花字 / 包装", ["花字", "包装", "动效", "小花字", "版式"]],
   ["字幕", ["字幕", "title", "Title", "打上"]],
   ["素材", ["素材", "版权", "插入"]],
+  ["美颜", ["美颜", "磨皮", "肤色", "皮肤", "祛痘", "瘦脸", "血色", "气血", "胖", "瘦", "双下巴"]],
   ["画面剪辑", ["切", "点头", "景别", "斜拼", "画面", "拉大", "圈出来", "停留"]],
   ["结构", ["开头", "结尾", "分隔页", "直接进", "按照脚本"]],
 ];
@@ -17,6 +19,10 @@ const elements = {
   time: document.querySelector("#timeInput"),
   type: document.querySelector("#typeInput"),
   note: document.querySelector("#noteInput"),
+  imageInput: document.querySelector("#referenceImageInput"),
+  imagePreview: document.querySelector("#referencePreview"),
+  imagePreviewImg: document.querySelector("#referencePreviewImage"),
+  removeImage: document.querySelector("#removeReferenceButton"),
   submit: document.querySelector("#submitButton"),
   copyLastTime: document.querySelector("#copyLastTimeButton"),
   cancel: document.querySelector("#cancelEditButton"),
@@ -31,6 +37,8 @@ const elements = {
 elements.form.addEventListener("submit", handleSubmit);
 elements.cancel.addEventListener("click", resetForm);
 elements.copyLastTime.addEventListener("click", copyLastTime);
+elements.imageInput.addEventListener("change", handleImageUpload);
+elements.removeImage.addEventListener("click", removeReferenceImage);
 elements.downloadJpg.addEventListener("click", downloadJpg);
 elements.clearAll.addEventListener("click", clearAll);
 document.addEventListener(
@@ -78,6 +86,7 @@ function handleSubmit(event) {
       target.note = note;
       target.type = selectedType === "自动识别" ? detectType(note, timecode) : selectedType;
       target.sortValue = getSortValue(timecode);
+      target.referenceImage = state.referenceImage;
       showToast("已保存成功");
     }
   } else {
@@ -88,6 +97,7 @@ function handleSubmit(event) {
       timecode,
       type: selectedType === "自动识别" ? detectType(note, timecode) : selectedType,
       note,
+      referenceImage: state.referenceImage,
       sortValue: getSortValue(timecode),
     });
     showToast("已添加成功");
@@ -187,10 +197,12 @@ function renderList(entries) {
           <div class="entry-meta">
             <div>
               <div class="entry-time">${String(total - index).padStart(2, "0")} · ${escapeHtml(entry.timecode)}</div>
-              <span class="tag ${getTagClass(entry.type)}">${escapeHtml(entry.type)}</span>
+      <span class="tag ${getTagClass(entry.type)}">${escapeHtml(entry.type)}</span>
+              ${entry.referenceImage ? '<span class="image-label">含参考图</span>' : ""}
             </div>
           </div>
           <p class="entry-note">${escapeHtml(entry.note)}</p>
+          ${entry.referenceImage ? `<img class="entry-image" src="${entry.referenceImage}" alt="参考图" />` : ""}
           <div class="entry-actions">
             <button type="button" data-action="edit" data-id="${entry.id}">编辑</button>
             <button type="button" data-action="delete" data-id="${entry.id}">删除</button>
@@ -233,6 +245,7 @@ function renderPreview(entries) {
               </div>
               <span class="tag ${getTagClass(entry.type)}">${escapeHtml(entry.type)}</span>
               <div class="preview-note">${escapeHtml(entry.note)}</div>
+              ${entry.referenceImage ? `<img class="preview-image" src="${entry.referenceImage}" alt="参考图" />` : ""}
             </article>
           `,
         )
@@ -248,6 +261,8 @@ function editEntry(id) {
   elements.time.value = entry.timecode;
   elements.type.value = [...elements.type.options].some((option) => option.value === entry.type) ? entry.type : "自动识别";
   elements.note.value = entry.note;
+  state.referenceImage = entry.referenceImage || null;
+  renderReferencePreview();
   elements.submit.textContent = "保存修改";
   elements.cancel.hidden = false;
   elements.note.focus();
@@ -274,6 +289,7 @@ function copyLastTime() {
   const latest = getLatestEntries()[0];
   elements.time.value = latest.timecode;
   elements.note.value = "";
+  removeReferenceImage();
   elements.note.focus();
   showToast("已复制时间轴");
 }
@@ -282,6 +298,8 @@ function resetForm(options = {}) {
   const { focusTime = true, forceFocus = false } = options;
   state.editingId = null;
   elements.form.reset();
+  state.referenceImage = null;
+  renderReferencePreview();
   elements.type.value = "自动识别";
   elements.submit.textContent = "添加一条";
   elements.cancel.hidden = true;
@@ -290,6 +308,33 @@ function resetForm(options = {}) {
   } else if (document.activeElement && typeof document.activeElement.blur === "function") {
     document.activeElement.blur();
   }
+}
+
+function handleImageUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    state.referenceImage = String(reader.result);
+    renderReferencePreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeReferenceImage() {
+  state.referenceImage = null;
+  elements.imageInput.value = "";
+  renderReferencePreview();
+}
+
+function renderReferencePreview() {
+  if (!state.referenceImage) {
+    elements.imagePreview.hidden = true;
+    elements.imagePreviewImg.removeAttribute("src");
+    return;
+  }
+  elements.imagePreview.hidden = false;
+  elements.imagePreviewImg.src = state.referenceImage;
 }
 
 let toastTimer = null;
@@ -307,10 +352,10 @@ function isSmallScreen() {
   return window.matchMedia("(max-width: 760px)").matches;
 }
 
-function downloadJpg() {
+async function downloadJpg() {
   const entries = getSortedEntries();
   if (!entries.length) return;
-  const canvas = createImageCanvas(entries);
+  const canvas = await createImageCanvas(entries);
   const filename = `修改意见_${getDateStamp()}.jpg`;
   if (canvas.toBlob) {
     canvas.toBlob(
@@ -331,7 +376,7 @@ function downloadJpg() {
   link.remove();
 }
 
-function createImageCanvas(entries) {
+async function createImageCanvas(entries) {
   const scale = 2;
   const width = 1600;
   const margin = 70;
@@ -350,9 +395,12 @@ function createImageCanvas(entries) {
   const measureCanvas = document.createElement("canvas");
   const measureCtx = measureCanvas.getContext("2d");
   measureCtx.font = fonts.note;
-  const cards = entries.map((entry) => {
+  const loadedImages = await Promise.all(entries.map((entry) => loadReferenceImage(entry.referenceImage)));
+  const cards = entries.map((entry, index) => {
     const lines = wrapCanvasText(measureCtx, entry.note, noteWidth);
-    return { entry, lines, height: 160 + lines.length * 62 };
+    const image = loadedImages[index];
+    const imageHeight = image ? calculateImageSize(image, width - margin * 2 - cardPad * 2).height + 70 : 0;
+    return { entry, lines, image, height: 160 + lines.length * 62 + imageHeight };
   });
   const height = Math.max(500, 244 + cards.reduce((sum, card) => sum + card.height + cardGap, 0));
 
@@ -372,7 +420,7 @@ function createImageCanvas(entries) {
   ctx.fillText(`共 ${entries.length} 条`, margin, 146);
 
   let y = 184;
-  cards.forEach(({ entry, lines, height: cardHeight }, index) => {
+  cards.forEach(({ entry, lines, image, height: cardHeight }, index) => {
     roundRect(ctx, margin, y, width - margin * 2, cardHeight, 18, "#fff", "#dfe1dc");
     ctx.fillStyle = "#777e8a";
     ctx.font = fonts.meta;
@@ -396,10 +444,57 @@ function createImageCanvas(entries) {
     lines.forEach((line, lineIndex) => {
       ctx.fillText(line, noteX + 22, noteY + 54 + lineIndex * 62);
     });
+
+    if (image) {
+      const imageBox = calculateImageSize(image, width - margin * 2 - cardPad * 2);
+      const imageY = noteY + lines.length * 62 + 46;
+      roundRect(ctx, noteX, imageY, imageBox.width, imageBox.height, 12, "#f4f5f0", null);
+      ctx.save();
+      roundedClip(ctx, noteX, imageY, imageBox.width, imageBox.height, 12);
+      ctx.drawImage(image, noteX, imageY, imageBox.width, imageBox.height);
+      ctx.restore();
+    }
     y += cardHeight + cardGap;
   });
 
   return canvas;
+}
+
+function loadReferenceImage(src) {
+  return new Promise((resolve) => {
+    if (!src) {
+      resolve(null);
+      return;
+    }
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = src;
+  });
+}
+
+function calculateImageSize(image, maxWidth) {
+  const width = Math.min(maxWidth, 760);
+  const ratio = image.naturalHeight / image.naturalWidth || 0.6;
+  return {
+    width,
+    height: Math.min(Math.round(width * ratio), 520),
+  };
+}
+
+function roundedClip(ctx, x, y, width, height, radius) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+  ctx.clip();
 }
 
 function wrapCanvasText(ctx, text, maxWidth) {
@@ -450,6 +545,7 @@ function getTagClass(type) {
   if (type.includes("花字") || type.includes("包装")) return "package";
   if (type.includes("字幕")) return "subtitle";
   if (type.includes("素材")) return "asset";
+  if (type.includes("美颜")) return "beauty";
   if (type.includes("画面")) return "visual";
   if (type.includes("结构")) return "structure";
   return "default";
@@ -460,6 +556,7 @@ function getCanvasTagColor(type) {
   if (type.includes("花字") || type.includes("包装")) return "#7052be";
   if (type.includes("字幕")) return "#187e9d";
   if (type.includes("素材")) return "#328051";
+  if (type.includes("美颜")) return "#cc4f8a";
   if (type.includes("画面")) return "#c56f1c";
   if (type.includes("结构")) return "#5865f2";
   return "#596170";

@@ -48,11 +48,21 @@
               <option value="花字 / 包装">花字 / 包装</option>
               <option value="字幕">字幕</option>
               <option value="素材">素材</option>
+              <option value="美颜">美颜</option>
               <option value="画面剪辑">画面剪辑</option>
               <option value="结构">结构</option>
               <option value="修改">修改</option>
             </select>
           </label>
+
+          <label class="field">
+            <span>参考图</span>
+            <input id="referenceImageInput" type="file" accept="image/*" />
+          </label>
+          <div class="reference-preview" id="referencePreview" hidden>
+            <img id="referencePreviewImage" alt="参考图预览" />
+            <button class="button ghost" id="removeReferenceButton" type="button">删除参考图</button>
+          </div>
 
           <div class="form-actions">
             <button class="button ghost" id="cancelEditButton" type="button" hidden>取消编辑</button>

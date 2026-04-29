@@ -286,6 +286,55 @@ textarea:focus {
   margin: 0 0 10px;
 }
 
+.image-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  margin-left: 8px;
+  border-radius: 6px;
+  padding: 0 8px;
+  background: #eaf0ff;
+  color: #2451c9;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.entry-image,
+.preview-image {
+  display: block;
+  width: min(100%, 420px);
+  max-height: 260px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #f4f5f0;
+  margin: 0 0 10px;
+}
+
+.preview-image {
+  margin-top: 12px;
+}
+
+.reference-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -4px 0 14px;
+}
+
+.reference-preview[hidden] {
+  display: none;
+}
+
+.reference-preview img {
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #f4f5f0;
+}
+
 .tag {
   display: inline-flex;
   align-items: center;
@@ -311,6 +360,10 @@ textarea:focus {
 
 .tag.asset {
   background: var(--green);
+}
+
+.tag.beauty {
+  background: #cc4f8a;
 }
 
 .tag.visual {
