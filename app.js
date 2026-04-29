@@ -18,6 +18,7 @@ const elements = {
   type: document.querySelector("#typeInput"),
   note: document.querySelector("#noteInput"),
   submit: document.querySelector("#submitButton"),
+  copyLastTime: document.querySelector("#copyLastTimeButton"),
   cancel: document.querySelector("#cancelEditButton"),
   list: document.querySelector("#entryList"),
   preview: document.querySelector("#imagePreview"),
@@ -29,6 +30,7 @@ const elements = {
 
 elements.form.addEventListener("submit", handleSubmit);
 elements.cancel.addEventListener("click", resetForm);
+elements.copyLastTime.addEventListener("click", copyLastTime);
 elements.downloadJpg.addEventListener("click", downloadJpg);
 elements.clearAll.addEventListener("click", clearAll);
 document.addEventListener(
@@ -92,7 +94,7 @@ function handleSubmit(event) {
   }
 
   saveEntries();
-  resetForm({ focusTime: false });
+  resetForm({ focusTime: true, forceFocus: true });
   render();
 }
 
@@ -121,6 +123,7 @@ function normalizeSingleTime(raw) {
     const parts = text.split(":").map(Number);
     if (parts.length === 2) return formatTime(0, parts[0], parts[1], 0);
     if (parts.length === 3) return formatTime(parts[0], parts[1], parts[2], 0);
+    if (parts.length === 4) return formatTime(parts[0], parts[1], parts[2], parts[3]);
   }
 
   const digits = text.replace(/\D/g, "");
@@ -159,9 +162,15 @@ function getSortedEntries() {
 
 function render() {
   const sorted = getSortedEntries();
+  const latestFirst = getLatestEntries();
   elements.count.textContent = `${sorted.length} 条`;
-  renderList(sorted);
+  elements.copyLastTime.disabled = state.entries.length === 0;
+  renderList(latestFirst);
   renderPreview(sorted);
+}
+
+function getLatestEntries() {
+  return [...state.entries].sort((a, b) => b.order - a.order);
 }
 
 function renderList(entries) {
@@ -170,13 +179,14 @@ function renderList(entries) {
     return;
   }
 
+  const total = entries.length;
   elements.list.innerHTML = entries
     .map(
       (entry, index) => `
         <article class="entry-item">
           <div class="entry-meta">
             <div>
-              <div class="entry-time">${String(index + 1).padStart(2, "0")} · ${escapeHtml(entry.timecode)}</div>
+              <div class="entry-time">${String(total - index).padStart(2, "0")} · ${escapeHtml(entry.timecode)}</div>
               <span class="tag ${getTagClass(entry.type)}">${escapeHtml(entry.type)}</span>
             </div>
           </div>
@@ -259,14 +269,23 @@ function clearAll() {
   showToast("已清空");
 }
 
+function copyLastTime() {
+  if (!state.entries.length) return;
+  const latest = getLatestEntries()[0];
+  elements.time.value = latest.timecode;
+  elements.note.value = "";
+  elements.note.focus();
+  showToast("已复制时间轴");
+}
+
 function resetForm(options = {}) {
-  const { focusTime = true } = options;
+  const { focusTime = true, forceFocus = false } = options;
   state.editingId = null;
   elements.form.reset();
   elements.type.value = "自动识别";
   elements.submit.textContent = "添加一条";
   elements.cancel.hidden = true;
-  if (focusTime && !isSmallScreen()) {
+  if (focusTime && (forceFocus || !isSmallScreen())) {
     elements.time.focus();
   } else if (document.activeElement && typeof document.activeElement.blur === "function") {
     document.activeElement.blur();

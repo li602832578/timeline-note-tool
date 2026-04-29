@@ -23,15 +23,17 @@
         <form class="editor-panel" id="entryForm">
           <label class="field">
             <span>时间轴</span>
-            <input id="timeInput" autocomplete="off" placeholder="如 0123、01:23、0138-0200" />
-            <small>不填时间轴时，会默认识别为“全片”。</small>
-          </label>
+              <input id="timeInput" autocomplete="off" placeholder="如 0123、01:23、0138-0200" />
+              <small>不填时间轴时，会默认识别为“全片”。</small>
+              <small>需要补充上一条意见时，先点击“补充上一条”，系统会自动带入上一条时间轴，再填写新的修改意见。</small>
+            </label>
 
           <label class="field note-field">
             <div class="note-heading">
               <span>修改意见</span>
               <div class="note-heading-actions">
                 <div class="status-toast" id="statusToast" role="status" aria-live="polite" hidden></div>
+                <button class="button ghost" id="copyLastTimeButton" type="button">补充上一条</button>
                 <button class="button primary" id="submitButton" type="submit">添加一条</button>
               </div>
             </div>
