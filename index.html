@@ -17,10 +17,28 @@
         <div class="top-actions">
           <button class="button ghost" id="clearAllButton" type="button">清空</button>
           <button class="button primary" id="downloadJpgButton" type="button">生成 JPG</button>
+          <button class="button secondary" id="downloadPdfButton" type="button">生成 PDF</button>
         </div>
       </header>
 
-      <section class="workspace">
+      <section class="workspace" id="workspace">
+        <section class="video-locator" id="videoLocator">
+          <div class="section-title">原片定位</div>
+          <div class="file-picker">
+            <label class="file-button" for="videoInput">上传原片</label>
+            <span id="videoFileName">未选择视频</span>
+            <input id="videoInput" type="file" accept="video/*" />
+          </div>
+          <div class="video-tools" id="videoTools" hidden>
+            <video id="sourceVideo" controls playsinline></video>
+            <div class="video-meta">
+              <span>当前时间：<strong id="currentVideoTime">00:00:00:00</strong></span>
+              <button class="button secondary" id="captureFrameButton" type="button">带入当前画面和时间轴</button>
+            </div>
+            <small>拖动视频到需要修改的位置，点击按钮后会自动填入时间轴，并把当前画面作为参考图。</small>
+          </div>
+        </section>
+
         <form class="editor-panel" id="entryForm">
           <label class="field">
             <span>时间轴</span>

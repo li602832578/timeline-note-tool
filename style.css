@@ -41,7 +41,7 @@ input[type="file"] {
 }
 
 .app-shell {
-  width: min(1480px, calc(100vw - 32px));
+  width: min(1680px, calc(100vw - 32px));
   margin: 0 auto;
   padding: 28px 0 42px;
 }
@@ -95,11 +95,12 @@ h1 {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(320px, 430px) minmax(320px, 420px) minmax(360px, 1fr);
+  grid-template-columns: minmax(360px, 520px) minmax(360px, 1fr);
   gap: 18px;
   align-items: start;
 }
 
+.video-locator,
 .editor-panel,
 .list-panel,
 .preview-panel {
@@ -114,11 +115,84 @@ h1 {
   top: 16px;
 }
 
+.workspace:not(.has-video) .video-locator {
+  grid-column: 1 / 2;
+  grid-row: 1;
+}
+
+.workspace:not(.has-video) .editor-panel {
+  grid-column: 1 / 2;
+  grid-row: 2;
+}
+
+.workspace:not(.has-video) .list-panel {
+  grid-column: 2 / 3;
+  grid-row: 1 / 3;
+}
+
+.workspace:not(.has-video) .preview-panel {
+  grid-column: 1 / -1;
+}
+
+.workspace.video-landscape {
+  grid-template-columns: minmax(680px, 1.35fr) minmax(360px, 0.65fr);
+}
+
+.workspace.video-landscape .video-locator {
+  grid-column: 1 / 2;
+  grid-row: 1;
+}
+
+.workspace.video-landscape .editor-panel {
+  grid-column: 2 / 3;
+  grid-row: 1;
+  position: sticky;
+  top: 16px;
+}
+
+.workspace.video-landscape .list-panel {
+  grid-column: 1 / 2;
+  grid-row: 2;
+}
+
+.workspace.video-landscape .preview-panel {
+  grid-column: 2 / 3;
+  grid-row: 2;
+}
+
+.workspace.video-landscape .video-tools video {
+  max-height: min(78vh, 820px);
+}
+
+.workspace.video-portrait {
+  grid-template-columns: minmax(380px, 560px) minmax(320px, 430px) minmax(320px, 1fr);
+}
+
+.workspace.video-portrait .video-locator {
+  grid-column: 1 / 2;
+  grid-row: span 2;
+  position: sticky;
+  top: 16px;
+}
+
+.workspace.video-portrait .video-tools video {
+  height: min(82vh, 980px);
+  max-height: none;
+  object-fit: contain;
+}
+
 .field {
   display: grid;
   align-content: start;
   gap: 7px;
   margin-bottom: 14px;
+}
+
+.section-title {
+  color: #384050;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 7px;
 }
 
 .field span {
@@ -351,6 +425,54 @@ textarea:focus {
   background: #f4f5f0;
 }
 
+.video-locator {
+  align-self: start;
+}
+
+.video-tools {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.video-tools[hidden] {
+  display: none;
+}
+
+.video-tools video {
+  width: 100%;
+  height: auto;
+  max-height: 520px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #111827;
+}
+
+.video-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.video-meta span {
+  color: #384050;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.video-meta strong {
+  color: #111827;
+  font-size: 16px;
+}
+
+.video-tools small {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .file-picker {
   display: flex;
   align-items: center;
@@ -515,6 +637,38 @@ textarea:focus {
     grid-template-columns: 1fr 1fr;
   }
 
+  .workspace:not(.has-video) .video-locator,
+  .workspace:not(.has-video) .editor-panel,
+  .workspace:not(.has-video) .list-panel,
+  .workspace:not(.has-video) .preview-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .workspace.video-landscape,
+  .workspace.video-portrait {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .workspace.video-landscape .video-locator,
+  .workspace.video-landscape .editor-panel,
+  .workspace.video-landscape .list-panel,
+  .workspace.video-landscape .preview-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .workspace.video-portrait .video-locator {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    position: static;
+  }
+
+  .workspace.video-portrait .video-tools video {
+    height: auto;
+    max-height: 620px;
+  }
+
   .preview-panel {
     grid-column: 1 / -1;
   }
@@ -536,11 +690,29 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
+  .workspace.video-landscape,
+  .workspace.video-portrait {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace.video-landscape .video-locator,
+  .workspace.video-portrait .video-locator,
+  .workspace:not(.has-video) .video-locator {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    position: static;
+  }
+
   h1 {
     font-size: 27px;
   }
 
   .field span {
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .section-title {
     font-size: 18px;
     font-weight: 800;
   }
@@ -605,5 +777,19 @@ textarea:focus {
 
   .file-picker span {
     font-size: 18px;
+  }
+
+  .video-meta {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .video-meta .button {
+    width: 100%;
+  }
+
+  .video-tools video {
+    height: auto;
+    max-height: 260px;
   }
 }

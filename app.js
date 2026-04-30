@@ -2,6 +2,7 @@ const state = {
   entries: loadEntries(),
   editingId: null,
   referenceImage: null,
+  videoUrl: null,
 };
 
 const typeRules = [
@@ -15,7 +16,15 @@ const typeRules = [
 ];
 
 const elements = {
+  workspace: document.querySelector("#workspace"),
+  videoLocator: document.querySelector("#videoLocator"),
   form: document.querySelector("#entryForm"),
+  videoInput: document.querySelector("#videoInput"),
+  videoFileName: document.querySelector("#videoFileName"),
+  videoTools: document.querySelector("#videoTools"),
+  sourceVideo: document.querySelector("#sourceVideo"),
+  currentVideoTime: document.querySelector("#currentVideoTime"),
+  captureFrame: document.querySelector("#captureFrameButton"),
   time: document.querySelector("#timeInput"),
   type: document.querySelector("#typeInput"),
   note: document.querySelector("#noteInput"),
@@ -32,15 +41,24 @@ const elements = {
   count: document.querySelector("#countLabel"),
   toast: document.querySelector("#statusToast"),
   downloadJpg: document.querySelector("#downloadJpgButton"),
+  downloadPdf: document.querySelector("#downloadPdfButton"),
   clearAll: document.querySelector("#clearAllButton"),
 };
 
 elements.form.addEventListener("submit", handleSubmit);
+elements.videoInput.addEventListener("change", handleVideoUpload);
+elements.sourceVideo.addEventListener("timeupdate", updateCurrentVideoTime);
+elements.sourceVideo.addEventListener("loadedmetadata", () => {
+  updateCurrentVideoTime();
+  updateVideoLayout();
+});
+elements.captureFrame.addEventListener("click", captureCurrentFrame);
 elements.cancel.addEventListener("click", resetForm);
 elements.copyLastTime.addEventListener("click", copyLastTime);
 elements.imageInput.addEventListener("change", handleImageUpload);
 elements.removeImage.addEventListener("click", removeReferenceImage);
 elements.downloadJpg.addEventListener("click", downloadJpg);
+elements.downloadPdf.addEventListener("click", downloadPdf);
 elements.clearAll.addEventListener("click", clearAll);
 document.addEventListener(
   "touchmove",
@@ -146,6 +164,15 @@ function normalizeSingleTime(raw) {
 
 function formatTime(hours, minutes, seconds, frames) {
   return [hours, minutes, seconds, frames].map((value) => String(value).padStart(2, "0")).join(":");
+}
+
+function formatSecondsToTimecode(totalSeconds) {
+  const safeSeconds = Number.isFinite(totalSeconds) ? Math.max(totalSeconds, 0) : 0;
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = Math.floor(safeSeconds % 60);
+  const frames = Math.floor((safeSeconds % 1) * 25);
+  return formatTime(hours, minutes, seconds, frames);
 }
 
 function detectType(note, timecode) {
@@ -295,6 +322,56 @@ function copyLastTime() {
   showToast("已复制时间轴");
 }
 
+function handleVideoUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (state.videoUrl) {
+    URL.revokeObjectURL(state.videoUrl);
+  }
+  state.videoUrl = URL.createObjectURL(file);
+  elements.videoFileName.textContent = file.name || "已选择视频";
+  elements.sourceVideo.src = state.videoUrl;
+  elements.videoTools.hidden = false;
+  elements.workspace.classList.add("has-video");
+  elements.workspace.classList.remove("video-portrait", "video-landscape");
+  showToast("原片已载入");
+}
+
+function updateCurrentVideoTime() {
+  elements.currentVideoTime.textContent = formatSecondsToTimecode(elements.sourceVideo.currentTime || 0);
+}
+
+function updateVideoLayout() {
+  const video = elements.sourceVideo;
+  if (!video.videoWidth || !video.videoHeight) return;
+  elements.workspace.classList.remove("video-portrait", "video-landscape");
+  elements.workspace.classList.add(video.videoHeight > video.videoWidth ? "video-portrait" : "video-landscape");
+}
+
+function captureCurrentFrame() {
+  const video = elements.sourceVideo;
+  if (!video.src || !video.videoWidth || !video.videoHeight) {
+    showToast("请先上传原片");
+    return;
+  }
+
+  const canvas = document.createElement("canvas");
+  const maxWidth = 900;
+  const ratio = video.videoHeight / video.videoWidth;
+  canvas.width = Math.min(video.videoWidth, maxWidth);
+  canvas.height = Math.round(canvas.width * ratio);
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  state.referenceImage = canvas.toDataURL("image/jpeg", 0.88);
+  elements.time.value = formatSecondsToTimecode(video.currentTime || 0);
+  elements.imageInput.value = "";
+  elements.imageFileName.textContent = "当前画面截图";
+  renderReferencePreview("当前画面截图");
+  elements.note.focus();
+  showToast("已带入画面");
+}
+
 function resetForm(options = {}) {
   const { focusTime = true, forceFocus = false } = options;
   state.editingId = null;
@@ -318,7 +395,7 @@ function handleImageUpload(event) {
   const reader = new FileReader();
   reader.onload = () => {
     state.referenceImage = String(reader.result);
-    renderReferencePreview();
+    renderReferencePreview(file.name || "已选择图片");
   };
   reader.readAsDataURL(file);
 }
@@ -330,7 +407,7 @@ function removeReferenceImage() {
   renderReferencePreview();
 }
 
-function renderReferencePreview() {
+function renderReferencePreview(label = "已选择图片") {
   if (!state.referenceImage) {
     elements.imagePreview.hidden = true;
     elements.imagePreviewImg.removeAttribute("src");
@@ -338,7 +415,7 @@ function renderReferencePreview() {
   }
   elements.imagePreview.hidden = false;
   elements.imagePreviewImg.src = state.referenceImage;
-  elements.imageFileName.textContent = "已选择图片";
+  elements.imageFileName.textContent = label;
 }
 
 let toastTimer = null;
@@ -357,10 +434,25 @@ function isSmallScreen() {
 }
 
 async function downloadJpg() {
-  const entries = getSortedEntries();
-  if (!entries.length) return;
-  const canvas = await createImageCanvas(entries);
-  const filename = `修改意见_${getDateStamp()}.jpg`;
+  try {
+    const entries = getSortedEntries();
+    if (!entries.length) return;
+    const imageCount = entries.filter((entry) => entry.referenceImage).length;
+    if (entries.length > 12 || imageCount >= 6) {
+      showToast("正在生成总览图");
+      const canvas = await createOverviewCanvas(entries, imageCount >= 6);
+      downloadCanvasAsJpg(canvas, `修改意见_${getDateStamp()}_总览.jpg`);
+      return;
+    }
+    const canvas = await createImageCanvas(entries);
+    downloadCanvasAsJpg(canvas, `修改意见_${getDateStamp()}.jpg`);
+  } catch (error) {
+    console.error(error);
+    showToast("生成失败，请重试");
+  }
+}
+
+function downloadCanvasAsJpg(canvas, filename) {
   if (canvas.toBlob) {
     canvas.toBlob(
       (blob) => {
@@ -368,16 +460,133 @@ async function downloadJpg() {
         downloadBlob(blob, filename, "image/jpeg");
       },
       "image/jpeg",
-      0.95,
+      0.86,
     );
     return;
   }
   const link = document.createElement("a");
-  link.href = canvas.toDataURL("image/jpeg", 0.95);
+  link.href = canvas.toDataURL("image/jpeg", 0.86);
   link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
+}
+
+async function createOverviewCanvas(entries, imageFocused = false) {
+  const scale = 2;
+  const width = 1920;
+  const margin = 64;
+  const gap = 18;
+  const cols = imageFocused ? 2 : 3;
+  const headerHeight = 168;
+  const cellWidth = (width - margin * 2 - gap * (cols - 1)) / cols;
+  const cellHeight = imageFocused ? 268 : 206;
+  const rows = Math.ceil(entries.length / cols);
+  const height = margin * 2 + headerHeight + rows * cellHeight + Math.max(rows - 1, 0) * gap;
+  const fonts = {
+    title: '800 46px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
+    small: '500 24px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
+    column: '900 26px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
+    index: '900 24px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
+    time: '900 30px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
+    type: '800 20px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
+    note: '800 27px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
+  };
+  const images = await Promise.all(entries.map((entry) => loadReferenceImage(entry.referenceImage)));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+  ctx.fillStyle = "#f6f7f1";
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = "#181f2a";
+  ctx.font = fonts.title;
+  ctx.fillText("视频修改意见总览", margin, 82);
+  ctx.fillStyle = "#5c6370";
+  ctx.font = fonts.small;
+  ctx.fillText(`共 ${entries.length} 条`, margin, 118);
+  for (let col = 0; col < cols; col += 1) {
+    const columnX = margin + col * (cellWidth + gap);
+    const label = `第 ${col + 1} 列 ↓`;
+    const labelY = margin + headerHeight - 42;
+    roundRect(ctx, columnX, labelY, cellWidth, 36, 9, "#182033", null);
+    ctx.fillStyle = "#fff";
+    ctx.font = fonts.column;
+    ctx.textAlign = "center";
+    ctx.fillText(label, columnX + cellWidth / 2, labelY + 27);
+    ctx.textAlign = "left";
+    if (col > 0) {
+      const lineX = columnX - gap / 2;
+      ctx.fillStyle = "#d5d8d0";
+      ctx.fillRect(lineX - 2, margin + headerHeight - 42, 4, height - margin - (margin + headerHeight - 42));
+    }
+  }
+
+  entries.forEach((entry, index) => {
+    const image = images[index];
+    const col = Math.floor(index / rows);
+    const row = index % rows;
+    const x = margin + col * (cellWidth + gap);
+    const y = margin + headerHeight + row * (cellHeight + gap);
+    const realIndex = index + 1;
+
+    roundRect(ctx, x, y, cellWidth, cellHeight, 14, "#fff", "#dfe1dc");
+    roundRect(ctx, x + 18, y + 16, 44, 36, 9, "#182033", null);
+    ctx.fillStyle = "#fff";
+    ctx.font = fonts.index;
+    ctx.fillText(String(realIndex).padStart(2, "0"), x + 26, y + 42);
+
+    ctx.fillStyle = "#09101b";
+    ctx.font = fonts.time;
+    ctx.fillText(entry.timecode, x + 74, y + 40);
+
+    const tagText = entry.type;
+    const tagColor = getCanvasTagColor(tagText);
+    ctx.font = fonts.type;
+    const tagWidth = Math.min(ctx.measureText(tagText).width + 24, cellWidth - 36);
+    roundRect(ctx, x + 18, y + 58, tagWidth, 32, 9, tagColor, null);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(tagText, x + 30, y + 82);
+
+    const noteX = x + 18;
+    const noteY = y + 104;
+    const noteHeight = cellHeight - 122;
+    const imageMaxWidth = imageFocused ? Math.min(310, cellWidth * 0.42) : 178;
+    const imageMaxHeight = imageFocused ? noteHeight : 126;
+    const imageBox = image ? calculateImageSize(image, imageMaxWidth, imageMaxWidth, imageMaxHeight) : null;
+    const imageX = image ? x + cellWidth - imageBox.width - 18 : 0;
+    const imageY = image ? y + 104 : 0;
+    const noteWidth = image ? imageX - noteX - 14 : cellWidth - 36;
+    roundRect(ctx, noteX, noteY, noteWidth, noteHeight, 10, "#fff1a8", null);
+    ctx.fillStyle = "#0c111a";
+    ctx.font = fonts.note;
+    const lines = wrapCanvasText(ctx, entry.note, noteWidth - 28).slice(0, 3);
+    lines.forEach((line, lineIndex) => {
+      ctx.fillText(line, noteX + 14, noteY + 38 + lineIndex * 38);
+    });
+
+    if (image) {
+      roundRect(ctx, imageX, imageY, imageBox.width, imageBox.height, 10, "#f4f5f0", null);
+      ctx.save();
+      roundedClip(ctx, imageX, imageY, imageBox.width, imageBox.height, 10);
+      ctx.drawImage(image, imageX, imageY, imageBox.width, imageBox.height);
+      ctx.restore();
+    }
+  });
+
+  return canvas;
+}
+
+async function downloadPdf() {
+  const entries = getSortedEntries();
+  if (!entries.length) return;
+  showToast("正在生成 PDF");
+  const canvas = await createImageCanvas(entries);
+  const pdfBytes = await createPdfFromCanvas(canvas);
+  downloadBlob(pdfBytes, `修改意见_${getDateStamp()}.pdf`, "application/pdf");
 }
 
 async function createImageCanvas(entries) {
@@ -386,7 +595,7 @@ async function createImageCanvas(entries) {
   const margin = 70;
   const cardPad = 34;
   const cardGap = 26;
-  const noteWidth = width - margin * 2 - cardPad * 2 - 44;
+  const fullContentWidth = width - margin * 2 - cardPad * 2;
   const fonts = {
     title: '800 54px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
     small: '500 30px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
@@ -401,10 +610,25 @@ async function createImageCanvas(entries) {
   measureCtx.font = fonts.note;
   const loadedImages = await Promise.all(entries.map((entry) => loadReferenceImage(entry.referenceImage)));
   const cards = entries.map((entry, index) => {
-    const lines = wrapCanvasText(measureCtx, entry.note, noteWidth);
     const image = loadedImages[index];
-    const imageHeight = image ? calculateImageSize(image, width - margin * 2 - cardPad * 2).height + 70 : 0;
-    return { entry, lines, image, height: 160 + lines.length * 62 + imageHeight };
+    const isPortraitImage = image && getImageRatio(image) > 1.12;
+    const imageBox = image ? calculateImageSize(image, fullContentWidth, isPortraitImage ? 430 : 760, isPortraitImage ? 560 : 520) : null;
+    const textWidth = isPortraitImage ? fullContentWidth - imageBox.width - 34 : fullContentWidth;
+    const lines = wrapCanvasText(measureCtx, entry.note, textWidth - 44);
+    const noteBlockHeight = lines.length * 62 + 28;
+    const baseHeight = 152 + noteBlockHeight + 34;
+    const imageExtraHeight = image && !isPortraitImage ? imageBox.height + 62 : 0;
+    const sideBySideHeight = image && isPortraitImage ? Math.max(baseHeight, 152 + imageBox.height + 34) : baseHeight;
+    return {
+      entry,
+      lines,
+      image,
+      imageBox,
+      isPortraitImage,
+      textWidth,
+      noteBlockHeight,
+      height: image && isPortraitImage ? sideBySideHeight : baseHeight + imageExtraHeight,
+    };
   });
   const height = Math.max(500, 244 + cards.reduce((sum, card) => sum + card.height + cardGap, 0));
 
@@ -424,7 +648,7 @@ async function createImageCanvas(entries) {
   ctx.fillText(`共 ${entries.length} 条`, margin, 146);
 
   let y = 184;
-  cards.forEach(({ entry, lines, image, height: cardHeight }, index) => {
+  cards.forEach(({ entry, lines, image, imageBox, isPortraitImage, textWidth, noteBlockHeight, height: cardHeight }, index) => {
     roundRect(ctx, margin, y, width - margin * 2, cardHeight, 18, "#fff", "#dfe1dc");
     ctx.fillStyle = "#777e8a";
     ctx.font = fonts.meta;
@@ -442,7 +666,7 @@ async function createImageCanvas(entries) {
 
     const noteX = margin + cardPad;
     const noteY = y + 152;
-    roundRect(ctx, noteX, noteY, width - margin * 2 - cardPad * 2, lines.length * 62 + 28, 12, "#fff1a8", null);
+    roundRect(ctx, noteX, noteY, textWidth, noteBlockHeight, 12, "#fff1a8", null);
     ctx.fillStyle = "#0c111a";
     ctx.font = fonts.note;
     lines.forEach((line, lineIndex) => {
@@ -450,12 +674,12 @@ async function createImageCanvas(entries) {
     });
 
     if (image) {
-      const imageBox = calculateImageSize(image, width - margin * 2 - cardPad * 2);
-      const imageY = noteY + lines.length * 62 + 46;
-      roundRect(ctx, noteX, imageY, imageBox.width, imageBox.height, 12, "#f4f5f0", null);
+      const imageX = isPortraitImage ? noteX + textWidth + 34 : noteX;
+      const imageY = isPortraitImage ? y + 152 : noteY + noteBlockHeight + 20;
+      roundRect(ctx, imageX, imageY, imageBox.width, imageBox.height, 12, "#f4f5f0", null);
       ctx.save();
-      roundedClip(ctx, noteX, imageY, imageBox.width, imageBox.height, 12);
-      ctx.drawImage(image, noteX, imageY, imageBox.width, imageBox.height);
+      roundedClip(ctx, imageX, imageY, imageBox.width, imageBox.height, 12);
+      ctx.drawImage(image, imageX, imageY, imageBox.width, imageBox.height);
       ctx.restore();
     }
     y += cardHeight + cardGap;
@@ -477,12 +701,25 @@ function loadReferenceImage(src) {
   });
 }
 
-function calculateImageSize(image, maxWidth) {
-  const width = Math.min(maxWidth, 760);
-  const ratio = image.naturalHeight / image.naturalWidth || 0.6;
+function getImageRatio(image) {
+  const naturalWidth = image.naturalWidth || image.width || 1;
+  const naturalHeight = image.naturalHeight || image.height || 1;
+  return naturalHeight / naturalWidth;
+}
+
+function calculateImageSize(image, maxWidth, preferredWidth = 760, maxHeight = 520) {
+  const naturalWidth = image.naturalWidth || image.width || 1;
+  const naturalHeight = image.naturalHeight || image.height || 1;
+  const ratio = naturalHeight / naturalWidth;
+  let width = Math.min(maxWidth, preferredWidth);
+  let height = Math.round(width * ratio);
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = Math.round(height / ratio);
+  }
   return {
     width,
-    height: Math.min(Math.round(width * ratio), 520),
+    height,
   };
 }
 
@@ -499,6 +736,128 @@ function roundedClip(ctx, x, y, width, height, radius) {
   ctx.quadraticCurveTo(x, y, x + radius, y);
   ctx.closePath();
   ctx.clip();
+}
+
+async function createPdfFromCanvas(sourceCanvas) {
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const margin = 24;
+  const contentWidth = pageWidth - margin * 2;
+  const contentHeight = pageHeight - margin * 2;
+  const sliceHeight = Math.floor(sourceCanvas.width * (contentHeight / contentWidth));
+  const pages = [];
+
+  for (let y = 0; y < sourceCanvas.height; y += sliceHeight) {
+    const currentHeight = Math.min(sliceHeight, sourceCanvas.height - y);
+    const pageCanvas = document.createElement("canvas");
+    pageCanvas.width = sourceCanvas.width;
+    pageCanvas.height = currentHeight;
+    const ctx = pageCanvas.getContext("2d");
+    ctx.fillStyle = "#f6f7f1";
+    ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+    ctx.drawImage(sourceCanvas, 0, y, sourceCanvas.width, currentHeight, 0, 0, sourceCanvas.width, currentHeight);
+    const jpegBytes = dataUrlToBytes(pageCanvas.toDataURL("image/jpeg", 0.86));
+    pages.push({
+      bytes: jpegBytes,
+      pixelWidth: pageCanvas.width,
+      pixelHeight: pageCanvas.height,
+      drawHeight: contentWidth * (pageCanvas.height / pageCanvas.width),
+    });
+  }
+
+  return buildImagePdf(pages, pageWidth, pageHeight, margin, contentWidth);
+}
+
+function dataUrlToBytes(dataUrl) {
+  const base64 = dataUrl.split(",")[1] || "";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function buildImagePdf(pages, pageWidth, pageHeight, margin, contentWidth) {
+  const encoder = new TextEncoder();
+  const objects = [];
+  const pageObjectIds = [];
+
+  const addObject = (content) => {
+    objects.push(content);
+    return objects.length;
+  };
+
+  const catalogId = addObject("");
+  const pagesId = addObject("");
+
+  pages.forEach((page, index) => {
+    const imageId = addObject({
+      header: `<< /Type /XObject /Subtype /Image /Width ${page.pixelWidth} /Height ${page.pixelHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${page.bytes.length} >>\nstream\n`,
+      bytes: page.bytes,
+      footer: "\nendstream",
+    });
+    const imageName = `/Im${index + 1}`;
+    const drawHeight = Math.min(page.drawHeight, pageHeight - margin * 2);
+    const drawY = pageHeight - margin - drawHeight;
+    const content = `q\n${contentWidth.toFixed(2)} 0 0 ${drawHeight.toFixed(2)} ${margin.toFixed(2)} ${drawY.toFixed(2)} cm\n${imageName} Do\nQ`;
+    const contentBytes = encoder.encode(content);
+    const contentId = addObject({
+      header: `<< /Length ${contentBytes.length} >>\nstream\n`,
+      bytes: contentBytes,
+      footer: "\nendstream",
+    });
+    const pageId = addObject(
+      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << ${imageName} ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`,
+    );
+    pageObjectIds.push(pageId);
+  });
+
+  objects[catalogId - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
+  objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageObjectIds.length} >>`;
+
+  const chunks = [];
+  const offsets = [0];
+  let length = 0;
+  const pushText = (text) => {
+    const bytes = encoder.encode(text);
+    chunks.push(bytes);
+    length += bytes.length;
+  };
+  const pushBytes = (bytes) => {
+    chunks.push(bytes);
+    length += bytes.length;
+  };
+
+  pushText("%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n");
+  objects.forEach((object, index) => {
+    offsets[index + 1] = length;
+    pushText(`${index + 1} 0 obj\n`);
+    if (typeof object === "string") {
+      pushText(object);
+    } else {
+      pushText(object.header);
+      pushBytes(object.bytes);
+      pushText(object.footer);
+    }
+    pushText("\nendobj\n");
+  });
+
+  const xrefOffset = length;
+  pushText(`xref\n0 ${objects.length + 1}\n`);
+  pushText("0000000000 65535 f \n");
+  for (let index = 1; index <= objects.length; index += 1) {
+    pushText(`${String(offsets[index]).padStart(10, "0")} 00000 n \n`);
+  }
+  pushText(`trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+
+  const output = new Uint8Array(length);
+  let offset = 0;
+  chunks.forEach((chunk) => {
+    output.set(chunk, offset);
+    offset += chunk.length;
+  });
+  return output;
 }
 
 function wrapCanvasText(ctx, text, maxWidth) {
