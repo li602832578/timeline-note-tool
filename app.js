@@ -40,6 +40,8 @@ const elements = {
   preview: document.querySelector("#imagePreview"),
   count: document.querySelector("#countLabel"),
   toast: document.querySelector("#statusToast"),
+  exportProject: document.querySelector("#exportProjectButton"),
+  importProject: document.querySelector("#importProjectInput"),
   downloadJpg: document.querySelector("#downloadJpgButton"),
   downloadPdf: document.querySelector("#downloadPdfButton"),
   clearAll: document.querySelector("#clearAllButton"),
@@ -57,6 +59,8 @@ elements.cancel.addEventListener("click", resetForm);
 elements.copyLastTime.addEventListener("click", copyLastTime);
 elements.imageInput.addEventListener("change", handleImageUpload);
 elements.removeImage.addEventListener("click", removeReferenceImage);
+elements.exportProject.addEventListener("click", exportProject);
+elements.importProject.addEventListener("change", importProject);
 elements.downloadJpg.addEventListener("click", downloadJpg);
 elements.downloadPdf.addEventListener("click", downloadPdf);
 elements.clearAll.addEventListener("click", clearAll);
@@ -106,10 +110,12 @@ function handleSubmit(event) {
       target.type = selectedType === "自动识别" ? detectType(note, timecode) : selectedType;
       target.sortValue = getSortValue(timecode);
       target.referenceImage = state.referenceImage;
+      target.updatedAt = new Date().toISOString();
       showToast("已保存成功");
     }
   } else {
     const timecode = normalizeTimeInput(rawTime);
+    const now = new Date().toISOString();
     state.entries.push({
       id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now() + Math.random()),
       order: Date.now() + state.entries.length,
@@ -118,6 +124,8 @@ function handleSubmit(event) {
       note,
       referenceImage: state.referenceImage,
       sortValue: getSortValue(timecode),
+      createdAt: now,
+      updatedAt: now,
     });
     showToast("已添加成功");
   }
@@ -431,6 +439,116 @@ function showToast(message) {
 
 function isSmallScreen() {
   return window.matchMedia("(max-width: 760px)").matches;
+}
+
+function exportProject() {
+  const project = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    entries: state.entries,
+  };
+  const content = JSON.stringify(project, null, 2);
+  downloadBlob(content, `视频修改意见项目_${getDateStamp()}.json`, "application/json");
+  showToast("项目已导出");
+}
+
+function importProject(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(String(reader.result || "{}"));
+      const incoming = Array.isArray(data) ? data : data.entries;
+      if (!Array.isArray(incoming)) throw new Error("invalid project");
+
+      const result = mergeImportedEntries(incoming);
+      saveEntries();
+      resetForm({ focusTime: false });
+      render();
+      showToast(`已导入 ${result.added} 条，合并 ${result.merged} 条`);
+    } catch (error) {
+      console.error(error);
+      showToast("项目文件无法导入");
+    } finally {
+      elements.importProject.value = "";
+    }
+  };
+  reader.readAsText(file);
+}
+
+function mergeImportedEntries(incomingEntries) {
+  let added = 0;
+  let merged = 0;
+  const byId = new Map(state.entries.map((entry) => [entry.id, entry]));
+  const byContent = new Map(state.entries.map((entry) => [getEntryContentKey(entry), entry]));
+
+  incomingEntries.forEach((entry, index) => {
+    const normalized = normalizeImportedEntry(entry, index);
+    if (!normalized) return;
+
+    const sameId = byId.get(normalized.id);
+    if (sameId) {
+      if (isImportedEntryNewer(normalized, sameId)) {
+        Object.assign(sameId, normalized);
+      }
+      merged += 1;
+      byContent.set(getEntryContentKey(sameId), sameId);
+      return;
+    }
+
+    const sameContent = byContent.get(getEntryContentKey(normalized));
+    if (sameContent) {
+      if (!sameContent.referenceImage && normalized.referenceImage) {
+        sameContent.referenceImage = normalized.referenceImage;
+        sameContent.updatedAt = normalized.updatedAt;
+      }
+      merged += 1;
+      byId.set(sameContent.id, sameContent);
+      return;
+    }
+
+    state.entries.push(normalized);
+    byId.set(normalized.id, normalized);
+    byContent.set(getEntryContentKey(normalized), normalized);
+    added += 1;
+  });
+
+  return { added, merged };
+}
+
+function normalizeImportedEntry(entry, index) {
+  if (!entry || typeof entry !== "object") return null;
+  const note = String(entry.note || "").trim();
+  if (!note) return null;
+
+  const timecode = entry.timecode ? String(entry.timecode) : "全片";
+  const type = entry.type ? String(entry.type) : detectType(note, timecode);
+  const now = new Date().toISOString();
+  return {
+    id: entry.id ? String(entry.id) : globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now() + Math.random()),
+    order: Number.isFinite(Number(entry.order)) ? Number(entry.order) : Date.now() + index,
+    timecode,
+    type,
+    note,
+    referenceImage: entry.referenceImage ? String(entry.referenceImage) : null,
+    sortValue: getSortValue(timecode),
+    createdAt: entry.createdAt || now,
+    updatedAt: entry.updatedAt || entry.createdAt || now,
+  };
+}
+
+function getEntryContentKey(entry) {
+  return [entry.timecode || "全片", entry.type || "修改", entry.note || ""].map((value) => String(value).trim()).join("||");
+}
+
+function isImportedEntryNewer(incoming, existing) {
+  const incomingTime = Date.parse(incoming.updatedAt || incoming.createdAt || "");
+  const existingTime = Date.parse(existing.updatedAt || existing.createdAt || "");
+  if (Number.isFinite(incomingTime) && Number.isFinite(existingTime)) return incomingTime > existingTime;
+  if (Number.isFinite(incomingTime)) return true;
+  return false;
 }
 
 async function downloadJpg() {
@@ -970,6 +1088,8 @@ function loadEntries() {
       ...entry,
       order: entry.order ?? Date.now() + index,
       sortValue: getSortValue(entry.timecode || "未指定"),
+      createdAt: entry.createdAt || null,
+      updatedAt: entry.updatedAt || entry.createdAt || null,
     }));
   } catch {
     return [];

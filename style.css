@@ -244,6 +244,9 @@ textarea:focus {
 }
 
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 6px;
   min-height: 40px;
@@ -263,8 +266,12 @@ textarea:focus {
 }
 
 .button.secondary {
-  background: #182033;
+  background: var(--blue);
   color: #fff;
+}
+
+.button.secondary:hover {
+  background: var(--blue-dark);
 }
 
 .button.ghost {
@@ -279,6 +286,10 @@ textarea:focus {
 .button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.import-project-button {
+  line-height: 1;
 }
 
 .note-heading {
@@ -490,7 +501,7 @@ textarea:focus {
   justify-content: center;
   min-height: 42px;
   border-radius: 6px;
-  background: #182033;
+  background: var(--blue);
   color: #fff;
   padding: 0 16px;
   font-size: 16px;
