@@ -9,9 +9,12 @@
   <body>
     <main class="app-shell">
       <header class="topbar">
-        <div>
-          <h1>视频修改意见生成器</h1>
-          <p>录入时间轴和修改意见，一键生成 JPG 长图。</p>
+        <div class="brand">
+          <div class="brand-logo" aria-hidden="true">▶</div>
+          <div class="brand-copy">
+            <h1>视频修改意见生成器</h1>
+            <p>录入时间轴和修改意见，一键生成 JPG 长图和 PDF。</p>
+          </div>
           <div class="highlight-note">今天你给 Judy 投票了吗</div>
         </div>
         <div class="top-actions">
@@ -25,15 +28,67 @@
       </header>
 
       <section class="workspace" id="workspace">
+        <section class="batch-panel">
+          <div class="section-title">批量识别</div>
+          <label class="field">
+            <span>粘贴 Judy 修改意见</span>
+            <textarea id="batchInput" rows="7" placeholder="把整段修改意见粘贴到这里。系统会自动识别行首时间轴，链接和提取码会合并到上一条。"></textarea>
+          </label>
+          <div class="batch-actions">
+            <button class="button ghost" id="clearBatchButton" type="button">清空粘贴内容</button>
+            <button class="button primary" id="parseBatchButton" type="button">识别并添加</button>
+          </div>
+        </section>
+
         <section class="video-locator" id="videoLocator">
-          <div class="section-title">原片定位</div>
-          <div class="file-picker">
+          <div class="section-title">01 原片定位</div>
+          <div class="file-picker video-dropzone" id="videoDropzone">
             <label class="file-button" for="videoInput">上传原片</label>
             <span id="videoFileName">未选择视频</span>
             <input id="videoInput" type="file" accept="video/*" />
           </div>
           <div class="video-tools" id="videoTools" hidden>
-            <video id="sourceVideo" controls playsinline></video>
+            <video id="sourceVideo" playsinline></video>
+            <div class="player-strip">
+              <button class="play-toggle" id="playToggleButton" type="button">播放</button>
+              <span class="strip-time" id="stripCurrentTime">00:00:00:00</span>
+              <input id="videoScrubber" class="video-scrubber" type="range" min="0" max="1000" value="0" step="1" aria-label="视频进度条" />
+              <span class="strip-time" id="stripDuration">00:00:00:00</span>
+              <button class="speed-toggle" id="speedToggleButton" type="button">1x</button>
+            </div>
+            <div class="precise-controls">
+              <div class="precise-head">
+                <span>精确定位</span>
+              <div class="jump-time">
+                <input id="jumpTimeInput" autocomplete="off" placeholder="如 0123、01:23" />
+                <button class="button ghost" id="jumpTimeButton" type="button">跳转</button>
+              </div>
+            </div>
+              <div class="nudge-actions">
+                <button class="button ghost" type="button" data-nudge="-5">-5秒</button>
+                <button class="button ghost" type="button" data-nudge="-1">-1秒</button>
+                <button class="button ghost" type="button" data-nudge="-frame">-1帧</button>
+                <button class="button ghost" type="button" data-nudge="frame">+1帧</button>
+                <button class="button ghost" type="button" data-nudge="1">+1秒</button>
+                <button class="button ghost" type="button" data-nudge="5">+5秒</button>
+              </div>
+            </div>
+            <div class="range-selector">
+              <div class="range-head">
+                <span>修改一整段时间</span>
+                <strong id="selectedRangeLabel">还没选这一段</strong>
+              </div>
+              <p class="range-help">如果这条意见不是某一秒，而是一整段视频，就用这里选时间段。</p>
+              <div class="range-status">
+                <span>开始：<b id="rangeStartText">未选择</b></span>
+                <span>结束：<b id="rangeEndText">未选择</b></span>
+              </div>
+              <div class="range-actions">
+                <button class="button ghost" id="setRangeStartButton" type="button">这段从这里开始</button>
+                <button class="button ghost" id="setRangeEndButton" type="button">这段到这里结束</button>
+                <button class="button secondary" id="applyRangeButton" type="button">填入这段时间</button>
+              </div>
+            </div>
             <div class="video-meta">
               <span>当前时间：<strong id="currentVideoTime">00:00:00:00</strong></span>
               <button class="button secondary" id="captureFrameButton" type="button">带入当前画面和时间轴</button>
@@ -43,6 +98,7 @@
         </section>
 
         <form class="editor-panel" id="entryForm">
+          <div class="section-title">02 录入意见</div>
           <label class="field">
             <span>时间轴</span>
               <input id="timeInput" autocomplete="off" placeholder="如 0123、01:23、0138-0200" />
@@ -97,7 +153,7 @@
 
         <section class="list-panel" aria-label="已添加修改意见">
           <div class="panel-heading">
-            <h2>已添加</h2>
+            <h2>03 已添加</h2>
             <span id="countLabel">0 条</span>
           </div>
           <div class="entry-list" id="entryList"></div>
@@ -105,7 +161,7 @@
 
         <section class="preview-panel" aria-label="长图预览">
           <div class="panel-heading">
-            <h2>JPG 预览</h2>
+            <h2>04 JPG 预览</h2>
             <span>自动按时间排序</span>
           </div>
           <div class="image-preview" id="imagePreview"></div>
