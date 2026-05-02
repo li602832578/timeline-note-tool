@@ -715,9 +715,51 @@ textarea:focus {
   font-weight: 900;
 }
 
+.play-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  min-width: 54px;
+  padding: 0;
+}
+
+.play-toggle::before {
+  content: "";
+  display: block;
+  width: 0;
+  height: 0;
+  margin-left: 4px;
+  border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent;
+  border-left: 14px solid #1f2937;
+}
+
+.play-toggle[data-playing="true"]::before {
+  width: 16px;
+  height: 18px;
+  margin-left: 0;
+  border: 0;
+  background: linear-gradient(90deg, #1f2937 0 35%, transparent 35% 65%, #1f2937 65% 100%);
+}
+
 .speed-toggle {
   min-width: 58px;
   color: var(--blue);
+}
+
+#captureFrameButton {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.25);
+}
+
+#captureFrameButton:hover {
+  background: var(--blue-dark);
+  color: #fff;
+  border-color: var(--blue-dark);
 }
 
 .strip-time {
@@ -806,7 +848,7 @@ textarea:focus {
 }
 
 .range-head strong {
-  color: var(--blue);
+  color: #0f172a;
   font-size: 12px;
   font-weight: 900;
 }
@@ -826,17 +868,49 @@ textarea:focus {
 }
 
 .range-status span {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
   border-radius: 12px;
   background: #fff;
   border: 1px solid var(--line);
-  padding: 10px 12px;
+  padding: 8px 10px;
   color: #64748b;
   font-size: 13px;
   font-weight: 800;
 }
 
+.range-time {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  padding: 4px 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
 .range-status b {
-  color: #0f172a;
+  color: var(--blue);
+}
+
+.range-clear {
+  border: 0;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: var(--blue);
+  min-height: 30px;
+  padding: 0 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.range-clear:hover {
+  background: var(--blue);
+  color: #fff;
 }
 
 .range-actions {

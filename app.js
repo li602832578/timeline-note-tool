@@ -37,6 +37,10 @@ const elements = {
   selectedRange: document.querySelector("#selectedRangeLabel"),
   rangeStartText: document.querySelector("#rangeStartText"),
   rangeEndText: document.querySelector("#rangeEndText"),
+  rangeStartJump: document.querySelector("#rangeStartJumpButton"),
+  rangeEndJump: document.querySelector("#rangeEndJumpButton"),
+  clearRangeStart: document.querySelector("#clearRangeStartButton"),
+  clearRangeEnd: document.querySelector("#clearRangeEndButton"),
   setRangeStart: document.querySelector("#setRangeStartButton"),
   setRangeEnd: document.querySelector("#setRangeEndButton"),
   applyRange: document.querySelector("#applyRangeButton"),
@@ -95,6 +99,10 @@ document.querySelectorAll("[data-nudge]").forEach((button) => {
 elements.setRangeStart.addEventListener("click", setRangeStart);
 elements.setRangeEnd.addEventListener("click", setRangeEnd);
 elements.applyRange.addEventListener("click", applySelectedRange);
+elements.rangeStartJump.addEventListener("click", () => jumpToRangePoint("start"));
+elements.rangeEndJump.addEventListener("click", () => jumpToRangePoint("end"));
+elements.clearRangeStart.addEventListener("click", () => clearRangePoint("start"));
+elements.clearRangeEnd.addEventListener("click", () => clearRangePoint("end"));
 elements.captureFrame.addEventListener("click", captureCurrentFrame);
 elements.cancel.addEventListener("click", resetForm);
 elements.copyLastTime.addEventListener("click", copyLastTime);
@@ -590,7 +598,9 @@ function toggleVideoPlayback() {
 }
 
 function updatePlayButton() {
-  elements.playToggle.textContent = elements.sourceVideo.paused ? "播放" : "暂停";
+  const isPlaying = !elements.sourceVideo.paused;
+  elements.playToggle.dataset.playing = isPlaying ? "true" : "false";
+  elements.playToggle.setAttribute("aria-label", isPlaying ? "暂停" : "播放");
 }
 
 function scrubVideo() {
@@ -632,6 +642,31 @@ function setRangeEnd() {
     return;
   }
   state.rangeEnd = elements.sourceVideo.currentTime || 0;
+  updateSelectedRangeLabel();
+}
+
+function jumpToRangePoint(point) {
+  if (!state.videoUrl) {
+    showToast("请先上传原片");
+    return;
+  }
+  const seconds = point === "start" ? state.rangeStart : state.rangeEnd;
+  if (!Number.isFinite(seconds)) {
+    showToast(point === "start" ? "还没选择开始时间" : "还没选择结束时间");
+    return;
+  }
+  seekVideoTo(seconds);
+  showToast(point === "start" ? "已跳到开始时间" : "已跳到结束时间");
+}
+
+function clearRangePoint(point) {
+  if (point === "start") {
+    state.rangeStart = null;
+    showToast("已删除开始时间");
+  } else {
+    state.rangeEnd = null;
+    showToast("已删除结束时间");
+  }
   updateSelectedRangeLabel();
 }
 
