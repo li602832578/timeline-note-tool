@@ -13,17 +13,18 @@
           <div class="brand-logo" aria-hidden="true">▶</div>
           <div class="brand-copy">
             <h1>视频修改意见生成器</h1>
-            <p>录入时间轴和修改意见，一键生成 JPG 长图和 PDF。</p>
+            <p>录入时间轴和修改意见，一键导出给剪辑看。</p>
           </div>
           <div class="highlight-note">今天你给 Judy 投票了吗</div>
         </div>
         <div class="top-actions">
           <button class="button ghost" id="clearAllButton" type="button">清空</button>
-          <button class="button ghost" id="exportProjectButton" type="button">导出意见</button>
-          <label class="button ghost import-project-button" for="importProjectInput">导入意见</label>
-          <input id="importProjectInput" type="file" accept=".json,application/json" />
-          <button class="button primary" id="downloadJpgButton" type="button">生成 JPG</button>
-          <button class="button secondary" id="downloadPdfButton" type="button">生成 PDF</button>
+          <label class="button ghost video-dropzone video-import-button" id="videoDropzone" for="videoInput">
+            <span>导入视频</span>
+            <span id="videoFileName" hidden>未选择视频</span>
+          </label>
+          <input id="videoInput" type="file" accept="video/*" />
+          <button class="button primary" id="downloadPdfButton" type="button">导出给剪辑看</button>
         </div>
       </header>
 
@@ -41,12 +42,6 @@
         </section>
 
         <section class="video-locator" id="videoLocator">
-          <div class="section-title">01 原片定位</div>
-          <div class="file-picker video-dropzone" id="videoDropzone">
-            <label class="file-button" for="videoInput">上传原片</label>
-            <span id="videoFileName">未选择视频</span>
-            <input id="videoInput" type="file" accept="video/*" />
-          </div>
           <div class="video-tools" id="videoTools" hidden>
             <video id="sourceVideo" playsinline></video>
             <div class="player-strip">
@@ -104,7 +99,20 @@
         </section>
 
         <form class="editor-panel" id="entryForm">
-          <div class="section-title">02 录入意见</div>
+          <div class="section-title-row">
+            <div class="section-title">02 录入意见</div>
+            <div class="section-tools">
+              <label class="button ghost import-project-button" for="importProjectInput">
+                <span class="button-icon" aria-hidden="true">↓</span>
+                <span>导入意见</span>
+              </label>
+              <input id="importProjectInput" type="file" accept=".json,application/json" />
+              <button class="button ghost" id="exportProjectButton" type="button">
+                <span class="button-icon" aria-hidden="true">↑</span>
+                <span>导出意见</span>
+              </button>
+            </div>
+          </div>
           <label class="field">
             <span>时间轴</span>
               <input id="timeInput" autocomplete="off" placeholder="如 0123、01:23、0138-0200" />
@@ -163,14 +171,6 @@
             <span id="countLabel">0 条</span>
           </div>
           <div class="entry-list" id="entryList"></div>
-        </section>
-
-        <section class="preview-panel" aria-label="长图预览">
-          <div class="panel-heading">
-            <h2>04 JPG 预览</h2>
-            <span>自动按时间排序</span>
-          </div>
-          <div class="image-preview" id="imagePreview"></div>
         </section>
       </section>
     </main>

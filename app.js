@@ -57,12 +57,10 @@ const elements = {
   copyLastTime: document.querySelector("#copyLastTimeButton"),
   cancel: document.querySelector("#cancelEditButton"),
   list: document.querySelector("#entryList"),
-  preview: document.querySelector("#imagePreview"),
   count: document.querySelector("#countLabel"),
   toast: document.querySelector("#statusToast"),
   exportProject: document.querySelector("#exportProjectButton"),
   importProject: document.querySelector("#importProjectInput"),
-  downloadJpg: document.querySelector("#downloadJpgButton"),
   downloadPdf: document.querySelector("#downloadPdfButton"),
   clearAll: document.querySelector("#clearAllButton"),
   batchInput: document.querySelector("#batchInput"),
@@ -110,7 +108,6 @@ elements.imageInput.addEventListener("change", handleImageUpload);
 elements.removeImage.addEventListener("click", removeReferenceImage);
 elements.exportProject.addEventListener("click", exportProject);
 elements.importProject.addEventListener("change", importProject);
-elements.downloadJpg.addEventListener("click", downloadJpg);
 elements.downloadPdf.addEventListener("click", downloadPdf);
 elements.clearAll.addEventListener("click", clearAll);
 elements.parseBatch.addEventListener("click", parseBatchText);
@@ -353,7 +350,6 @@ function render() {
   elements.count.textContent = `${sorted.length} 条`;
   elements.copyLastTime.disabled = state.entries.length === 0;
   renderList(latestFirst, duplicateHints);
-  renderPreview(sorted);
 }
 
 function getLatestEntries() {
@@ -539,7 +535,7 @@ function copyLastTime() {
 function jumpVideoToEntry(id) {
   const entry = state.entries.find((item) => item.id === id);
   if (!entry || !state.videoUrl || !Number.isFinite(entry.sortValue) || entry.sortValue < 0) {
-    showToast(state.videoUrl ? "这条意见没有可定位时间" : "请先上传原片");
+    showToast(state.videoUrl ? "这条意见没有可定位时间" : "请先导入视频");
     return;
   }
   seekVideoTo(entry.sortValue);
@@ -550,7 +546,7 @@ function jumpVideoToEntry(id) {
 
 function nudgeVideo(amount) {
   if (!state.videoUrl) {
-    showToast("请先上传原片");
+    showToast("请先导入视频");
     return;
   }
   const frameStep = 1 / 25;
@@ -561,7 +557,7 @@ function nudgeVideo(amount) {
 
 function jumpToTypedTime() {
   if (!state.videoUrl) {
-    showToast("请先上传原片");
+    showToast("请先导入视频");
     return;
   }
   const raw = elements.jumpTime.value.trim();
@@ -587,7 +583,7 @@ function seekVideoTo(seconds) {
 
 function toggleVideoPlayback() {
   if (!state.videoUrl) {
-    showToast("请先上传原片");
+    showToast("请先导入视频");
     return;
   }
   if (elements.sourceVideo.paused) {
@@ -629,7 +625,7 @@ function timecodeToSeconds(timecode) {
 
 function setRangeStart() {
   if (!state.videoUrl) {
-    showToast("请先上传原片");
+    showToast("请先导入视频");
     return;
   }
   state.rangeStart = elements.sourceVideo.currentTime || 0;
@@ -638,7 +634,7 @@ function setRangeStart() {
 
 function setRangeEnd() {
   if (!state.videoUrl) {
-    showToast("请先上传原片");
+    showToast("请先导入视频");
     return;
   }
   state.rangeEnd = elements.sourceVideo.currentTime || 0;
@@ -647,7 +643,7 @@ function setRangeEnd() {
 
 function jumpToRangePoint(point) {
   if (!state.videoUrl) {
-    showToast("请先上传原片");
+    showToast("请先导入视频");
     return;
   }
   const seconds = point === "start" ? state.rangeStart : state.rangeEnd;
@@ -728,7 +724,7 @@ function loadVideoFile(file) {
   state.rangeStart = null;
   state.rangeEnd = null;
   updateSelectedRangeLabel();
-  showToast("原片已载入");
+  showToast("视频已导入");
 }
 
 function handleVideoDragEnter(event) {
@@ -773,7 +769,7 @@ function updateVideoLayout() {
 function captureCurrentFrame() {
   const video = elements.sourceVideo;
   if (!video.src || !video.videoWidth || !video.videoHeight) {
-    showToast("请先上传原片");
+    showToast("请先导入视频");
     return;
   }
 
