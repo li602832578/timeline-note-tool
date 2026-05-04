@@ -23,8 +23,8 @@ const elements = {
   form: document.querySelector("#entryForm"),
   videoInput: document.querySelector("#videoInput"),
   videoDropzone: document.querySelector("#videoDropzone"),
-  videoFileName: document.querySelector("#videoFileName"),
-  videoTools: document.querySelector("#videoTools"),
+  videoEmptyState: document.querySelector("#videoEmptyState"),
+  videoDisplay: document.querySelector("#videoDisplay"),
   sourceVideo: document.querySelector("#sourceVideo"),
   currentVideoTime: document.querySelector("#currentVideoTime"),
   playToggle: document.querySelector("#playToggleButton"),
@@ -44,7 +44,6 @@ const elements = {
   setRangeStart: document.querySelector("#setRangeStartButton"),
   setRangeEnd: document.querySelector("#setRangeEndButton"),
   applyRange: document.querySelector("#applyRangeButton"),
-  captureFrame: document.querySelector("#captureFrameButton"),
   time: document.querySelector("#timeInput"),
   type: document.querySelector("#typeInput"),
   note: document.querySelector("#noteInput"),
@@ -54,7 +53,6 @@ const elements = {
   imagePreviewImg: document.querySelector("#referencePreviewImage"),
   removeImage: document.querySelector("#removeReferenceButton"),
   submit: document.querySelector("#submitButton"),
-  copyLastTime: document.querySelector("#copyLastTimeButton"),
   cancel: document.querySelector("#cancelEditButton"),
   list: document.querySelector("#entryList"),
   count: document.querySelector("#countLabel"),
@@ -63,9 +61,6 @@ const elements = {
   importProject: document.querySelector("#importProjectInput"),
   downloadPdf: document.querySelector("#downloadPdfButton"),
   clearAll: document.querySelector("#clearAllButton"),
-  batchInput: document.querySelector("#batchInput"),
-  parseBatch: document.querySelector("#parseBatchButton"),
-  clearBatch: document.querySelector("#clearBatchButton"),
 };
 
 elements.form.addEventListener("submit", handleSubmit);
@@ -101,19 +96,13 @@ elements.rangeStartJump.addEventListener("click", () => jumpToRangePoint("start"
 elements.rangeEndJump.addEventListener("click", () => jumpToRangePoint("end"));
 elements.clearRangeStart.addEventListener("click", () => clearRangePoint("start"));
 elements.clearRangeEnd.addEventListener("click", () => clearRangePoint("end"));
-elements.captureFrame.addEventListener("click", captureCurrentFrame);
 elements.cancel.addEventListener("click", resetForm);
-elements.copyLastTime.addEventListener("click", copyLastTime);
 elements.imageInput.addEventListener("change", handleImageUpload);
 elements.removeImage.addEventListener("click", removeReferenceImage);
 elements.exportProject.addEventListener("click", exportProject);
 elements.importProject.addEventListener("change", importProject);
 elements.downloadPdf.addEventListener("click", downloadPdf);
 elements.clearAll.addEventListener("click", clearAll);
-elements.parseBatch.addEventListener("click", parseBatchText);
-elements.clearBatch.addEventListener("click", () => {
-  elements.batchInput.value = "";
-});
 document.addEventListener(
   "touchmove",
   (event) => {
@@ -246,7 +235,7 @@ function parseBatchEntries(text) {
     }
 
     entries.push({
-      timecode: line.startsWith("开头") ? "00:00:00:00" : "全片",
+      timecode: line.startsWith("开头") ? "00:00" : "全片",
       note: line,
     });
   });
@@ -284,6 +273,13 @@ function normalizeTimeInput(raw) {
   return normalizeSingleTime(value);
 }
 
+function normalizeStoredTimecode(value) {
+  const text = String(value || "").trim();
+  if (!text) return "全片";
+  if (text === "全片" || text === "未指定") return text;
+  return normalizeTimeInput(text);
+}
+
 function normalizeSingleTime(raw) {
   const text = raw.replace(/\s+/g, "");
   const minuteMatch = text.match(/^(\d+)分(\d{1,2})秒?$/);
@@ -307,17 +303,17 @@ function normalizeSingleTime(raw) {
   return formatTime(Number(digits.slice(0, -4)), Number(digits.slice(-4, -2)), Number(digits.slice(-2)), 0);
 }
 
-function formatTime(hours, minutes, seconds, frames) {
-  return [hours, minutes, seconds, frames].map((value) => String(value).padStart(2, "0")).join(":");
+function formatTime(hours, minutes, seconds) {
+  const totalSeconds = Math.max(0, (Number(hours) || 0) * 3600 + (Number(minutes) || 0) * 60 + (Number(seconds) || 0));
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  return `${String(totalMinutes).padStart(2, "0")}:${String(totalSeconds % 60).padStart(2, "0")}`;
 }
 
 function formatSecondsToTimecode(totalSeconds) {
   const safeSeconds = Number.isFinite(totalSeconds) ? Math.max(totalSeconds, 0) : 0;
-  const hours = Math.floor(safeSeconds / 3600);
-  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const totalMinutes = Math.floor(safeSeconds / 60);
   const seconds = Math.floor(safeSeconds % 60);
-  const frames = Math.floor((safeSeconds % 1) * 25);
-  return formatTime(hours, minutes, seconds, frames);
+  return formatTime(0, totalMinutes, seconds);
 }
 
 function detectType(note, timecode) {
@@ -330,10 +326,8 @@ function getSortValue(timecode) {
   if (timecode === "全片") return -1;
   if (timecode === "未指定") return Number.POSITIVE_INFINITY;
   const firstTime = timecode.split("-")[0].trim();
-  const match = firstTime.match(/^(\d{2}):(\d{2}):(\d{2}):(\d{2})$/);
-  if (!match) return Number.POSITIVE_INFINITY;
-  const [, hours, minutes, seconds, frames] = match.map(Number);
-  return hours * 3600 + minutes * 60 + seconds + frames / 100;
+  const seconds = timecodeToSeconds(firstTime);
+  return Number.isFinite(seconds) ? seconds : Number.POSITIVE_INFINITY;
 }
 
 function getSortedEntries() {
@@ -348,7 +342,6 @@ function render() {
   const latestFirst = getLatestEntries();
   const duplicateHints = findDuplicateHints(state.entries);
   elements.count.textContent = `${sorted.length} 条`;
-  elements.copyLastTime.disabled = state.entries.length === 0;
   renderList(latestFirst, duplicateHints);
 }
 
@@ -378,7 +371,6 @@ function renderList(entries, duplicateHints = new Map()) {
             </div>
           </div>
           <p class="entry-note">${escapeHtml(entry.note)}</p>
-          ${entry.referenceImage ? `<img class="entry-image" src="${entry.referenceImage}" alt="参考图" />` : ""}
           <div class="entry-actions">
             <button type="button" data-action="edit" data-id="${entry.id}">编辑</button>
             <button type="button" data-action="delete" data-id="${entry.id}">删除</button>
@@ -522,16 +514,6 @@ function clearAll() {
   showToast("已清空");
 }
 
-function copyLastTime() {
-  if (!state.entries.length) return;
-  const latest = getLatestEntries()[0];
-  elements.time.value = latest.timecode;
-  elements.note.value = "";
-  removeReferenceImage();
-  elements.note.focus();
-  showToast("已复制时间轴");
-}
-
 function jumpVideoToEntry(id) {
   const entry = state.entries.find((item) => item.id === id);
   if (!entry || !state.videoUrl || !Number.isFinite(entry.sortValue) || entry.sortValue < 0) {
@@ -549,8 +531,7 @@ function nudgeVideo(amount) {
     showToast("请先导入视频");
     return;
   }
-  const frameStep = 1 / 25;
-  const delta = amount === "frame" ? frameStep : amount === "-frame" ? -frameStep : Number(amount);
+  const delta = Number(amount);
   if (!Number.isFinite(delta)) return;
   seekVideoTo((elements.sourceVideo.currentTime || 0) + delta);
 }
@@ -579,6 +560,12 @@ function seekVideoTo(seconds) {
   const max = Number.isFinite(duration) && duration > 0 ? duration : Number.POSITIVE_INFINITY;
   elements.sourceVideo.currentTime = Math.max(0, Math.min(seconds, max));
   updateCurrentVideoTime();
+  syncCurrentVideoTimeToInput();
+}
+
+function syncCurrentVideoTimeToInput() {
+  if (!state.videoUrl) return;
+  elements.time.value = formatSecondsToTimecode(elements.sourceVideo.currentTime || 0);
 }
 
 function toggleVideoPlayback() {
@@ -617,10 +604,15 @@ function cyclePlaybackSpeed() {
 }
 
 function timecodeToSeconds(timecode) {
-  const match = String(timecode).match(/^(\d{2}):(\d{2}):(\d{2}):(\d{2})$/);
-  if (!match) return Number.NaN;
-  const [, hours, minutes, seconds, frames] = match.map(Number);
-  return hours * 3600 + minutes * 60 + seconds + frames / 25;
+  const parts = String(timecode)
+    .trim()
+    .split(":")
+    .map(Number);
+  if (parts.some((part) => !Number.isFinite(part))) return Number.NaN;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 4) return parts[0] * 3600 + parts[1] * 60 + parts[2] + parts[3] / 25;
+  return Number.NaN;
 }
 
 function setRangeStart() {
@@ -716,9 +708,9 @@ function loadVideoFile(file) {
     URL.revokeObjectURL(state.videoUrl);
   }
   state.videoUrl = URL.createObjectURL(file);
-  elements.videoFileName.textContent = file.name || "已选择视频";
   elements.sourceVideo.src = state.videoUrl;
-  elements.videoTools.hidden = false;
+  elements.videoEmptyState.hidden = true;
+  elements.videoDisplay.hidden = false;
   elements.workspace.classList.add("has-video");
   elements.workspace.classList.remove("video-portrait", "video-landscape");
   state.rangeStart = null;
@@ -755,7 +747,7 @@ function updateCurrentVideoTime() {
   const currentText = formatSecondsToTimecode(current);
   elements.currentVideoTime.textContent = currentText;
   elements.stripCurrentTime.textContent = currentText;
-  elements.stripDuration.textContent = Number.isFinite(duration) && duration > 0 ? formatSecondsToTimecode(duration) : "00:00:00:00";
+  elements.stripDuration.textContent = Number.isFinite(duration) && duration > 0 ? formatSecondsToTimecode(duration) : "00:00";
   elements.videoScrubber.value = Number.isFinite(duration) && duration > 0 ? String(Math.round((current / duration) * 1000)) : "0";
 }
 
@@ -764,30 +756,6 @@ function updateVideoLayout() {
   if (!video.videoWidth || !video.videoHeight) return;
   elements.workspace.classList.remove("video-portrait", "video-landscape");
   elements.workspace.classList.add(video.videoHeight > video.videoWidth ? "video-portrait" : "video-landscape");
-}
-
-function captureCurrentFrame() {
-  const video = elements.sourceVideo;
-  if (!video.src || !video.videoWidth || !video.videoHeight) {
-    showToast("请先导入视频");
-    return;
-  }
-
-  const canvas = document.createElement("canvas");
-  const maxWidth = 900;
-  const ratio = video.videoHeight / video.videoWidth;
-  canvas.width = Math.min(video.videoWidth, maxWidth);
-  canvas.height = Math.round(canvas.width * ratio);
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-  state.referenceImage = canvas.toDataURL("image/jpeg", 0.88);
-  elements.time.value = formatSecondsToTimecode(video.currentTime || 0);
-  elements.imageInput.value = "";
-  elements.imageFileName.textContent = "当前画面截图";
-  renderReferencePreview("当前画面截图");
-  elements.note.focus();
-  showToast("已带入画面");
 }
 
 function resetForm(options = {}) {
@@ -933,7 +901,7 @@ function normalizeImportedEntry(entry, index) {
   const note = String(entry.note || "").trim();
   if (!note) return null;
 
-  const timecode = entry.timecode ? String(entry.timecode) : "全片";
+  const timecode = normalizeStoredTimecode(entry.timecode);
   const type = entry.type ? String(entry.type) : detectType(note, timecode);
   const now = new Date().toISOString();
   return {
@@ -1731,13 +1699,17 @@ function saveEntries() {
 
 function loadEntries() {
   try {
-    return JSON.parse(localStorage.getItem("timeline-note-entries") || "[]").map((entry, index) => ({
-      ...entry,
-      order: entry.order ?? Date.now() + index,
-      sortValue: getSortValue(entry.timecode || "未指定"),
-      createdAt: entry.createdAt || null,
-      updatedAt: entry.updatedAt || entry.createdAt || null,
-    }));
+    return JSON.parse(localStorage.getItem("timeline-note-entries") || "[]").map((entry, index) => {
+      const timecode = normalizeStoredTimecode(entry.timecode || "未指定");
+      return {
+        ...entry,
+        timecode,
+        order: entry.order ?? Date.now() + index,
+        sortValue: getSortValue(timecode),
+        createdAt: entry.createdAt || null,
+        updatedAt: entry.updatedAt || entry.createdAt || null,
+      };
+    });
   } catch {
     return [];
   }

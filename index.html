@@ -18,37 +18,28 @@
           <div class="highlight-note">今天你给 Judy 投票了吗</div>
         </div>
         <div class="top-actions">
-          <button class="button ghost" id="clearAllButton" type="button">清空</button>
-          <label class="button ghost video-dropzone video-import-button" id="videoDropzone" for="videoInput">
-            <span>导入视频</span>
-            <span id="videoFileName" hidden>未选择视频</span>
-          </label>
-          <input id="videoInput" type="file" accept="video/*" />
           <button class="button primary" id="downloadPdfButton" type="button">导出给剪辑看</button>
         </div>
       </header>
 
       <section class="workspace" id="workspace">
-        <section class="batch-panel">
-          <div class="section-title">批量识别</div>
-          <label class="field">
-            <span>粘贴 Judy 修改意见</span>
-            <textarea id="batchInput" rows="7" placeholder="把整段修改意见粘贴到这里。系统会自动识别行首时间轴，链接和提取码会合并到上一条。"></textarea>
-          </label>
-          <div class="batch-actions">
-            <button class="button ghost" id="clearBatchButton" type="button">清空粘贴内容</button>
-            <button class="button primary" id="parseBatchButton" type="button">识别并添加</button>
-          </div>
-        </section>
-
         <section class="video-locator" id="videoLocator">
-          <div class="video-tools" id="videoTools" hidden>
-            <video id="sourceVideo" playsinline></video>
+          <div class="video-stage video-dropzone" id="videoDropzone">
+            <input id="videoInput" type="file" accept="video/*" />
+            <div class="video-empty" id="videoEmptyState">
+              <label class="video-empty-button" for="videoInput">导入视频</label>
+              <div class="video-empty-text">支持拖拽视频到这里</div>
+            </div>
+            <div class="video-display" id="videoDisplay" hidden>
+              <video id="sourceVideo" playsinline></video>
+            </div>
+          </div>
+          <div class="video-tools">
             <div class="player-strip">
               <button class="play-toggle" id="playToggleButton" type="button" aria-label="播放" data-playing="false"></button>
-              <span class="strip-time" id="stripCurrentTime">00:00:00:00</span>
+              <span class="strip-time" id="stripCurrentTime">00:00</span>
               <input id="videoScrubber" class="video-scrubber" type="range" min="0" max="1000" value="0" step="1" aria-label="视频进度条" />
-              <span class="strip-time" id="stripDuration">00:00:00:00</span>
+              <span class="strip-time" id="stripDuration">00:00</span>
               <button class="speed-toggle" id="speedToggleButton" type="button">1x</button>
             </div>
             <div class="precise-controls">
@@ -62,8 +53,6 @@
               <div class="nudge-actions">
                 <button class="button ghost" type="button" data-nudge="-5">-5秒</button>
                 <button class="button ghost" type="button" data-nudge="-1">-1秒</button>
-                <button class="button ghost" type="button" data-nudge="-frame">-1帧</button>
-                <button class="button ghost" type="button" data-nudge="frame">+1帧</button>
                 <button class="button ghost" type="button" data-nudge="1">+1秒</button>
                 <button class="button ghost" type="button" data-nudge="5">+5秒</button>
               </div>
@@ -91,16 +80,15 @@
               </div>
             </div>
             <div class="video-meta">
-              <span>当前时间：<strong id="currentVideoTime">00:00:00:00</strong></span>
-              <button class="button secondary" id="captureFrameButton" type="button">带入当前画面和时间轴</button>
+              <span>当前时间：<strong id="currentVideoTime">00:00</strong></span>
             </div>
-            <small>拖动视频到需要修改的位置，点击按钮后会自动填入时间轴，并把当前画面作为参考图。</small>
+            <small>拖动视频到需要修改的位置，时间轴会自动填入“录入意见”里。如需参考图，可在下方手动上传。</small>
           </div>
         </section>
 
         <form class="editor-panel" id="entryForm">
           <div class="section-title-row">
-            <div class="section-title">02 录入意见</div>
+            <div class="section-title">录入意见</div>
             <div class="section-tools">
               <label class="button ghost import-project-button" for="importProjectInput">
                 <span class="button-icon" aria-hidden="true">↓</span>
@@ -117,7 +105,6 @@
             <span>时间轴</span>
               <input id="timeInput" autocomplete="off" placeholder="如 0123、01:23、0138-0200" />
               <small>不填时间轴时，会默认识别为“全片”。</small>
-              <small>需要补充上一条意见时，先点击“补充上一条”，系统会自动带入上一条时间轴，再填写新的修改意见。</small>
             </label>
 
           <label class="field note-field">
@@ -125,7 +112,6 @@
               <span>修改意见</span>
               <div class="note-heading-actions">
                 <div class="status-toast" id="statusToast" role="status" aria-live="polite" hidden></div>
-                <button class="button ghost" id="copyLastTimeButton" type="button">补充上一条</button>
                 <button class="button primary" id="submitButton" type="submit">添加一条</button>
               </div>
             </div>
@@ -167,8 +153,11 @@
 
         <section class="list-panel" aria-label="已添加修改意见">
           <div class="panel-heading">
-            <h2>03 已添加</h2>
-            <span id="countLabel">0 条</span>
+            <h2>已添加</h2>
+            <div class="panel-heading-actions">
+              <span id="countLabel">0 条</span>
+              <button class="button ghost" id="clearAllButton" type="button">清空</button>
+            </div>
           </div>
           <div class="entry-list" id="entryList"></div>
         </section>
