@@ -5,6 +5,8 @@ const state = {
   videoUrl: null,
   rangeStart: null,
   rangeEnd: null,
+  hasPendingExport: false,
+  pendingImport: null,
 };
 
 const typeRules = [
@@ -18,6 +20,7 @@ const typeRules = [
 ];
 
 const elements = {
+  appShell: document.querySelector("#appShell"),
   workspace: document.querySelector("#workspace"),
   videoLocator: document.querySelector("#videoLocator"),
   form: document.querySelector("#entryForm"),
@@ -26,40 +29,42 @@ const elements = {
   videoEmptyState: document.querySelector("#videoEmptyState"),
   videoDisplay: document.querySelector("#videoDisplay"),
   sourceVideo: document.querySelector("#sourceVideo"),
-  currentVideoTime: document.querySelector("#currentVideoTime"),
   playToggle: document.querySelector("#playToggleButton"),
+  scrubberWrap: document.querySelector(".scrubber-wrap"),
   videoScrubber: document.querySelector("#videoScrubber"),
+  rangeVisual: document.querySelector("#rangeVisual"),
+  rangeFill: document.querySelector("#rangeFill"),
+  rangeStartMarker: document.querySelector("#rangeStartMarker"),
+  rangeEndMarker: document.querySelector("#rangeEndMarker"),
+  rangeBubble: document.querySelector("#rangeBubble"),
   stripCurrentTime: document.querySelector("#stripCurrentTime"),
   stripDuration: document.querySelector("#stripDuration"),
   speedToggle: document.querySelector("#speedToggleButton"),
-  jumpTime: document.querySelector("#jumpTimeInput"),
-  jumpTimeButton: document.querySelector("#jumpTimeButton"),
-  selectedRange: document.querySelector("#selectedRangeLabel"),
-  rangeStartText: document.querySelector("#rangeStartText"),
-  rangeEndText: document.querySelector("#rangeEndText"),
-  rangeStartJump: document.querySelector("#rangeStartJumpButton"),
-  rangeEndJump: document.querySelector("#rangeEndJumpButton"),
-  clearRangeStart: document.querySelector("#clearRangeStartButton"),
-  clearRangeEnd: document.querySelector("#clearRangeEndButton"),
   setRangeStart: document.querySelector("#setRangeStartButton"),
   setRangeEnd: document.querySelector("#setRangeEndButton"),
-  applyRange: document.querySelector("#applyRangeButton"),
   time: document.querySelector("#timeInput"),
   type: document.querySelector("#typeInput"),
   note: document.querySelector("#noteInput"),
   imageInput: document.querySelector("#referenceImageInput"),
+  imagePicker: document.querySelector(".file-picker"),
   imageFileName: document.querySelector("#referenceFileName"),
   imagePreview: document.querySelector("#referencePreview"),
   imagePreviewImg: document.querySelector("#referencePreviewImage"),
   removeImage: document.querySelector("#removeReferenceButton"),
   submit: document.querySelector("#submitButton"),
-  cancel: document.querySelector("#cancelEditButton"),
   list: document.querySelector("#entryList"),
   count: document.querySelector("#countLabel"),
   toast: document.querySelector("#statusToast"),
   exportProject: document.querySelector("#exportProjectButton"),
   importProject: document.querySelector("#importProjectInput"),
+  duplicateReview: document.querySelector("#duplicateReview"),
+  duplicateReviewSummary: document.querySelector("#duplicateReviewSummary"),
+  duplicateReviewList: document.querySelector("#duplicateReviewList"),
+  skipDuplicates: document.querySelector("#skipDuplicatesButton"),
+  importAll: document.querySelector("#importAllButton"),
+  cancelImport: document.querySelector("#cancelImportButton"),
   downloadPdf: document.querySelector("#downloadPdfButton"),
+  downloadJiaYuan: document.querySelector("#downloadJiaYuanButton"),
   clearAll: document.querySelector("#clearAllButton"),
 };
 
@@ -72,36 +77,34 @@ elements.videoDropzone.addEventListener("drop", handleVideoDrop);
 elements.sourceVideo.addEventListener("timeupdate", updateCurrentVideoTime);
 elements.sourceVideo.addEventListener("loadedmetadata", () => {
   updateCurrentVideoTime();
+  updateSelectedRangeState();
   updateVideoLayout();
 });
 elements.sourceVideo.addEventListener("play", updatePlayButton);
 elements.sourceVideo.addEventListener("pause", updatePlayButton);
 elements.playToggle.addEventListener("click", toggleVideoPlayback);
 elements.videoScrubber.addEventListener("input", scrubVideo);
+elements.rangeStartMarker.addEventListener("pointerdown", (event) => beginRangeDrag(event, "start"));
+elements.rangeEndMarker.addEventListener("pointerdown", (event) => beginRangeDrag(event, "end"));
 elements.speedToggle.addEventListener("click", cyclePlaybackSpeed);
-elements.jumpTimeButton.addEventListener("click", jumpToTypedTime);
-elements.jumpTime.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    jumpToTypedTime();
-  }
-});
 document.querySelectorAll("[data-nudge]").forEach((button) => {
   button.addEventListener("click", () => nudgeVideo(button.dataset.nudge));
 });
 elements.setRangeStart.addEventListener("click", setRangeStart);
 elements.setRangeEnd.addEventListener("click", setRangeEnd);
-elements.applyRange.addEventListener("click", applySelectedRange);
-elements.rangeStartJump.addEventListener("click", () => jumpToRangePoint("start"));
-elements.rangeEndJump.addEventListener("click", () => jumpToRangePoint("end"));
-elements.clearRangeStart.addEventListener("click", () => clearRangePoint("start"));
-elements.clearRangeEnd.addEventListener("click", () => clearRangePoint("end"));
-elements.cancel.addEventListener("click", resetForm);
 elements.imageInput.addEventListener("change", handleImageUpload);
+elements.imagePicker.addEventListener("click", (event) => {
+  if (event.target === elements.imageInput || event.target.closest(".file-button")) return;
+  elements.imageInput.click();
+});
 elements.removeImage.addEventListener("click", removeReferenceImage);
 elements.exportProject.addEventListener("click", exportProject);
 elements.importProject.addEventListener("change", importProject);
+elements.skipDuplicates.addEventListener("click", () => confirmPendingImport({ skipDuplicates: true }));
+elements.importAll.addEventListener("click", () => confirmPendingImport({ skipDuplicates: false }));
+elements.cancelImport.addEventListener("click", cancelPendingImport);
 elements.downloadPdf.addEventListener("click", downloadPdf);
+elements.downloadJiaYuan.addEventListener("click", downloadJiaYuanScript);
 elements.clearAll.addEventListener("click", clearAll);
 document.addEventListener(
   "touchmove",
@@ -126,10 +129,11 @@ document.addEventListener(
   },
   { passive: false },
 );
+window.addEventListener("beforeunload", handleBeforeUnload);
 
 render();
 
-function handleSubmit(event) {
+async function handleSubmit(event) {
   event.preventDefault();
   const rawTime = elements.time.value.trim();
   const note = elements.note.value.trim();
@@ -150,10 +154,12 @@ function handleSubmit(event) {
       target.sortValue = getSortValue(timecode);
       target.referenceImage = state.referenceImage;
       target.updatedAt = new Date().toISOString();
+      markNeedsExport();
       showToast("已保存成功");
     }
   } else {
     const timecode = normalizeTimeInput(rawTime);
+    const frameImage = await captureCurrentVideoFrame();
     const now = new Date().toISOString();
     state.entries.push({
       id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now() + Math.random()),
@@ -162,15 +168,18 @@ function handleSubmit(event) {
       type: selectedType === "自动识别" ? detectType(note, timecode) : selectedType,
       note,
       referenceImage: state.referenceImage,
+      frameImage,
       sortValue: getSortValue(timecode),
       createdAt: now,
       updatedAt: now,
     });
+    markNeedsExport();
     showToast("已添加成功");
   }
 
   saveEntries();
   resetForm({ focusTime: true, forceFocus: true });
+  clearSelectedRange({ syncCurrentTime: true });
   render();
 }
 
@@ -361,11 +370,15 @@ function renderList(entries, duplicateHints = new Map()) {
       (entry, index) => {
         const duplicate = duplicateHints.get(entry.id);
         return `
-        <article class="entry-item ${duplicate ? "is-duplicate" : ""}" data-entry-id="${entry.id}">
+        <article class="entry-item type-${getTagClass(entry.type)} ${duplicate ? "is-duplicate" : ""}" data-entry-id="${entry.id}">
           <div class="entry-meta">
-            <div>
-              <button class="entry-time" type="button" data-action="jump" data-id="${entry.id}">${String(total - index).padStart(2, "0")} · ${escapeHtml(entry.timecode)}</button>
-      <span class="tag ${getTagClass(entry.type)}">${escapeHtml(entry.type)}</span>
+            <div class="entry-meta-main">
+              <span class="entry-index">${String(total - index).padStart(2, "0")}</span>
+              <button class="entry-time" type="button" data-action="jump" data-id="${entry.id}">${escapeHtml(entry.timecode)}</button>
+            </div>
+            <div class="entry-labels">
+              <span class="tag ${getTagClass(entry.type)}">${escapeHtml(entry.type)}</span>
+              ${entry.frameImage ? '<span class="image-label">含时间轴截图</span>' : ""}
               ${entry.referenceImage ? '<span class="image-label">含参考图</span>' : ""}
               ${duplicate ? `<button class="duplicate-label" type="button" data-action="highlight" data-id="${duplicate.otherId}">可能和第 ${duplicate.otherNumber} 条重复</button>` : ""}
             </div>
@@ -475,7 +488,7 @@ function renderPreview(entries) {
               </div>
               <span class="tag ${getTagClass(entry.type)}">${escapeHtml(entry.type)}</span>
               <div class="preview-note">${escapeHtml(entry.note)}</div>
-              ${entry.referenceImage ? `<img class="preview-image" src="${entry.referenceImage}" alt="参考图" />` : ""}
+              ${getEntryImageSource(entry) ? `<img class="preview-image" src="${getEntryImageSource(entry)}" alt="参考图" />` : ""}
             </article>
           `,
         )
@@ -494,13 +507,13 @@ function editEntry(id) {
   state.referenceImage = entry.referenceImage || null;
   renderReferencePreview();
   elements.submit.textContent = "保存修改";
-  elements.cancel.hidden = false;
   elements.note.focus();
 }
 
 function deleteEntry(id) {
   state.entries = state.entries.filter((entry) => entry.id !== id);
   if (state.editingId === id) resetForm();
+  markNeedsExport(state.entries.length > 0);
   saveEntries();
   render();
 }
@@ -508,8 +521,10 @@ function deleteEntry(id) {
 function clearAll() {
   if (!state.entries.length) return;
   state.entries = [];
+  markNeedsExport(false);
   saveEntries();
   resetForm();
+  clearSelectedRange();
   render();
   showToast("已清空");
 }
@@ -536,25 +551,6 @@ function nudgeVideo(amount) {
   seekVideoTo((elements.sourceVideo.currentTime || 0) + delta);
 }
 
-function jumpToTypedTime() {
-  if (!state.videoUrl) {
-    showToast("请先导入视频");
-    return;
-  }
-  const raw = elements.jumpTime.value.trim();
-  if (!raw) {
-    elements.jumpTime.focus();
-    return;
-  }
-  const timecode = normalizeSingleTime(raw);
-  const seconds = timecodeToSeconds(timecode);
-  if (!Number.isFinite(seconds)) {
-    showToast("时间格式不对");
-    return;
-  }
-  seekVideoTo(seconds);
-}
-
 function seekVideoTo(seconds) {
   const duration = elements.sourceVideo.duration;
   const max = Number.isFinite(duration) && duration > 0 ? duration : Number.POSITIVE_INFINITY;
@@ -565,6 +561,10 @@ function seekVideoTo(seconds) {
 
 function syncCurrentVideoTimeToInput() {
   if (!state.videoUrl) return;
+  if (Number.isFinite(state.rangeStart) || Number.isFinite(state.rangeEnd)) {
+    syncRangeToTimeInput();
+    return;
+  }
   elements.time.value = formatSecondsToTimecode(elements.sourceVideo.currentTime || 0);
 }
 
@@ -621,7 +621,9 @@ function setRangeStart() {
     return;
   }
   state.rangeStart = elements.sourceVideo.currentTime || 0;
-  updateSelectedRangeLabel();
+  syncRangeToTimeInput();
+  updateSelectedRangeState();
+  showToast(`已标记开始 ${formatSecondsToTimecode(state.rangeStart)}`);
 }
 
 function setRangeEnd() {
@@ -630,62 +632,109 @@ function setRangeEnd() {
     return;
   }
   state.rangeEnd = elements.sourceVideo.currentTime || 0;
-  updateSelectedRangeLabel();
+  syncRangeToTimeInput();
+  updateSelectedRangeState();
+  showToast(`已标记结束 ${formatSecondsToTimecode(state.rangeEnd)}`);
 }
 
-function jumpToRangePoint(point) {
-  if (!state.videoUrl) {
-    showToast("请先导入视频");
+function syncRangeToTimeInput() {
+  const hasStart = Number.isFinite(state.rangeStart);
+  const hasEnd = Number.isFinite(state.rangeEnd);
+  if (!hasStart && !hasEnd) return;
+  if (hasStart && hasEnd) {
+    const start = Math.min(state.rangeStart, state.rangeEnd);
+    const end = Math.max(state.rangeStart, state.rangeEnd);
+    elements.time.value = `${formatSecondsToTimecode(start)} - ${formatSecondsToTimecode(end)}`;
     return;
   }
-  const seconds = point === "start" ? state.rangeStart : state.rangeEnd;
-  if (!Number.isFinite(seconds)) {
-    showToast(point === "start" ? "还没选择开始时间" : "还没选择结束时间");
+  if (hasStart) {
+    elements.time.value = `${formatSecondsToTimecode(state.rangeStart)} -`;
     return;
   }
-  seekVideoTo(seconds);
-  showToast(point === "start" ? "已跳到开始时间" : "已跳到结束时间");
+  elements.time.value = formatSecondsToTimecode(state.rangeEnd);
 }
 
-function clearRangePoint(point) {
-  if (point === "start") {
-    state.rangeStart = null;
-    showToast("已删除开始时间");
+function clearSelectedRange(options = {}) {
+  state.rangeStart = null;
+  state.rangeEnd = null;
+  updateSelectedRangeState();
+  if (options.syncCurrentTime && state.videoUrl) {
+    elements.time.value = formatSecondsToTimecode(elements.sourceVideo.currentTime || 0);
+  }
+}
+
+function updateSelectedRangeState() {
+  const hasStart = Number.isFinite(state.rangeStart);
+  const hasEnd = Number.isFinite(state.rangeEnd);
+  const duration = elements.sourceVideo.duration || 0;
+  const canDraw = Number.isFinite(duration) && duration > 0 && (hasStart || hasEnd);
+
+  elements.setRangeStart.classList.toggle("is-marked", hasStart);
+  elements.setRangeEnd.classList.toggle("is-marked", hasEnd);
+  elements.setRangeStart.textContent = hasStart ? `已标记开始 ${formatSecondsToTimecode(state.rangeStart)}` : "标记开始";
+  elements.setRangeEnd.textContent = hasEnd ? `已标记结束 ${formatSecondsToTimecode(state.rangeEnd)}` : "标记结束";
+
+  elements.rangeVisual.hidden = !canDraw;
+  if (!canDraw) return;
+
+  const startPercent = hasStart ? Math.max(0, Math.min(100, (state.rangeStart / duration) * 100)) : null;
+  const endPercent = hasEnd ? Math.max(0, Math.min(100, (state.rangeEnd / duration) * 100)) : null;
+  const firstPercent = Math.min(startPercent ?? endPercent, endPercent ?? startPercent);
+  const lastPercent = Math.max(startPercent ?? endPercent, endPercent ?? startPercent);
+
+  elements.rangeStartMarker.hidden = !hasStart;
+  elements.rangeEndMarker.hidden = !hasEnd;
+  if (hasStart) elements.rangeStartMarker.style.left = `${startPercent}%`;
+  if (hasEnd) elements.rangeEndMarker.style.left = `${endPercent}%`;
+
+  elements.rangeFill.hidden = !(hasStart && hasEnd);
+  if (hasStart && hasEnd) {
+    elements.rangeFill.style.left = `${firstPercent}%`;
+    elements.rangeFill.style.width = `${Math.max(0, lastPercent - firstPercent)}%`;
+    elements.rangeBubble.hidden = false;
+    elements.rangeBubble.style.left = `${(firstPercent + lastPercent) / 2}%`;
+    elements.rangeBubble.textContent = `${formatSecondsToTimecode(Math.min(state.rangeStart, state.rangeEnd))} - ${formatSecondsToTimecode(Math.max(state.rangeStart, state.rangeEnd))}`;
   } else {
-    state.rangeEnd = null;
-    showToast("已删除结束时间");
+    elements.rangeBubble.hidden = false;
+    elements.rangeBubble.style.left = `${firstPercent}%`;
+    elements.rangeBubble.textContent = hasStart ? `${formatSecondsToTimecode(state.rangeStart)} -` : formatSecondsToTimecode(state.rangeEnd);
   }
-  updateSelectedRangeLabel();
 }
 
-function applySelectedRange() {
-  if (!Number.isFinite(state.rangeStart) || !Number.isFinite(state.rangeEnd)) {
-    showToast("请先设置起点和终点");
-    return;
-  }
-  const start = Math.min(state.rangeStart, state.rangeEnd);
-  const end = Math.max(state.rangeStart, state.rangeEnd);
-  if (Math.abs(end - start) < 0.04) {
-    showToast("起点和终点太接近");
-    return;
-  }
-  elements.time.value = `${formatSecondsToTimecode(start)} - ${formatSecondsToTimecode(end)}`;
-  elements.note.focus();
-  showToast("已带入选中区间");
+function beginRangeDrag(event, point) {
+  if (!state.videoUrl) return;
+  event.preventDefault();
+  const marker = point === "start" ? elements.rangeStartMarker : elements.rangeEndMarker;
+  marker.setPointerCapture?.(event.pointerId);
+  marker.classList.add("is-dragging");
+
+  const handleMove = (moveEvent) => updateDraggedRangePoint(moveEvent, point);
+  const handleEnd = () => {
+    marker.classList.remove("is-dragging");
+    window.removeEventListener("pointermove", handleMove);
+    window.removeEventListener("pointerup", handleEnd);
+    window.removeEventListener("pointercancel", handleEnd);
+    syncRangeToTimeInput();
+  };
+
+  window.addEventListener("pointermove", handleMove);
+  window.addEventListener("pointerup", handleEnd);
+  window.addEventListener("pointercancel", handleEnd);
 }
 
-function updateSelectedRangeLabel() {
-  if (!Number.isFinite(state.rangeStart) && !Number.isFinite(state.rangeEnd)) {
-    elements.selectedRange.textContent = "还没选这一段";
-    elements.rangeStartText.textContent = "未选择";
-    elements.rangeEndText.textContent = "未选择";
-    return;
+function updateDraggedRangePoint(event, point) {
+  const duration = elements.sourceVideo.duration || 0;
+  if (!Number.isFinite(duration) || duration <= 0) return;
+  const rect = elements.scrubberWrap.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  const seconds = ratio * duration;
+  if (point === "start") {
+    state.rangeStart = seconds;
+  } else {
+    state.rangeEnd = seconds;
   }
-  const startText = Number.isFinite(state.rangeStart) ? formatSecondsToTimecode(state.rangeStart) : "未设起点";
-  const endText = Number.isFinite(state.rangeEnd) ? formatSecondsToTimecode(state.rangeEnd) : "未设终点";
-  elements.selectedRange.textContent = `${startText} - ${endText}`;
-  elements.rangeStartText.textContent = startText;
-  elements.rangeEndText.textContent = endText;
+  syncRangeToTimeInput();
+  updateSelectedRangeState();
 }
 
 function escapeSelector(value) {
@@ -709,13 +758,13 @@ function loadVideoFile(file) {
   }
   state.videoUrl = URL.createObjectURL(file);
   elements.sourceVideo.src = state.videoUrl;
+  elements.appShell.classList.remove("intro-mode");
+  elements.workspace.classList.remove("intro");
   elements.videoEmptyState.hidden = true;
   elements.videoDisplay.hidden = false;
   elements.workspace.classList.add("has-video");
   elements.workspace.classList.remove("video-portrait", "video-landscape");
-  state.rangeStart = null;
-  state.rangeEnd = null;
-  updateSelectedRangeLabel();
+  clearSelectedRange();
   showToast("视频已导入");
 }
 
@@ -745,10 +794,10 @@ function updateCurrentVideoTime() {
   const current = elements.sourceVideo.currentTime || 0;
   const duration = elements.sourceVideo.duration || 0;
   const currentText = formatSecondsToTimecode(current);
-  elements.currentVideoTime.textContent = currentText;
   elements.stripCurrentTime.textContent = currentText;
   elements.stripDuration.textContent = Number.isFinite(duration) && duration > 0 ? formatSecondsToTimecode(duration) : "00:00";
   elements.videoScrubber.value = Number.isFinite(duration) && duration > 0 ? String(Math.round((current / duration) * 1000)) : "0";
+  updateSelectedRangeState();
 }
 
 function updateVideoLayout() {
@@ -766,7 +815,6 @@ function resetForm(options = {}) {
   renderReferencePreview();
   elements.type.value = "自动识别";
   elements.submit.textContent = "添加一条";
-  elements.cancel.hidden = true;
   if (focusTime && (forceFocus || !isSmallScreen())) {
     elements.time.focus();
   } else if (document.activeElement && typeof document.activeElement.blur === "function") {
@@ -804,6 +852,33 @@ function renderReferencePreview(label = "已选择图片") {
   elements.imageFileName.textContent = label;
 }
 
+async function captureCurrentVideoFrame() {
+  const video = elements.sourceVideo;
+  if (!state.videoUrl || !video.videoWidth || !video.videoHeight || video.readyState < 2) return null;
+
+  const maxWidth = 640;
+  const scale = Math.min(1, maxWidth / video.videoWidth);
+  const width = Math.max(1, Math.round(video.videoWidth * scale));
+  const height = Math.max(1, Math.round(video.videoHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  try {
+    ctx.drawImage(video, 0, 0, width, height);
+    return canvas.toDataURL("image/jpeg", 0.82);
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
+
+function getEntryImageSource(entry) {
+  return entry?.frameImage || entry?.referenceImage || null;
+}
+
 let toastTimer = null;
 
 function showToast(message) {
@@ -820,13 +895,16 @@ function isSmallScreen() {
 }
 
 function exportProject() {
+  const exportName = requestExportName("导出意见");
+  if (!exportName) return;
   const project = {
     version: 1,
     exportedAt: new Date().toISOString(),
     entries: state.entries,
   };
   const content = JSON.stringify(project, null, 2);
-  downloadBlob(content, `视频修改意见项目_${getDateStamp()}.json`, "application/json");
+  downloadBlob(content, `${exportName}项目.json`, "application/json");
+  markExported();
   showToast("项目已导出");
 }
 
@@ -841,11 +919,19 @@ function importProject(event) {
       const incoming = Array.isArray(data) ? data : data.entries;
       if (!Array.isArray(incoming)) throw new Error("invalid project");
 
-      const result = mergeImportedEntries(incoming);
-      saveEntries();
-      resetForm({ focusTime: false });
-      render();
-      showToast(`已导入 ${result.added} 条，合并 ${result.merged} 条`);
+      const normalized = incoming.map((entry, index) => normalizeImportedEntry(entry, index)).filter(Boolean);
+      if (!normalized.length) {
+        showToast("没有可导入的意见");
+        return;
+      }
+
+      const duplicateIssues = findImportDuplicateIssues(normalized);
+      if (duplicateIssues.length) {
+        showDuplicateImportReview(file.name || "导入文件", normalized, duplicateIssues);
+        return;
+      }
+
+      completeImportedEntries(normalized);
     } catch (error) {
       console.error(error);
       showToast("项目文件无法导入");
@@ -854,6 +940,18 @@ function importProject(event) {
     }
   };
   reader.readAsText(file);
+}
+
+function completeImportedEntries(incomingEntries, options = {}) {
+  const skippedIndexes = options.skippedIndexes || new Set();
+  const entriesToImport = incomingEntries.filter((entry, index) => !skippedIndexes.has(index));
+  const result = mergeImportedEntries(entriesToImport);
+  markNeedsExport(state.entries.length > 0);
+  saveEntries();
+  resetForm({ focusTime: false });
+  render();
+  hideDuplicateImportReview();
+  showToast(`已导入 ${result.added} 条，合并 ${result.merged} 条${result.skipped ? `，跳过 ${result.skipped} 条` : ""}`);
 }
 
 function mergeImportedEntries(incomingEntries) {
@@ -868,6 +966,15 @@ function mergeImportedEntries(incomingEntries) {
 
     const sameId = byId.get(normalized.id);
     if (sameId) {
+      if (getEntryContentKey(sameId) !== getEntryContentKey(normalized)) {
+        normalized.id = globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now() + Math.random() + index);
+        state.entries.push(normalized);
+        byId.set(normalized.id, normalized);
+        byContent.set(getEntryContentKey(normalized), normalized);
+        added += 1;
+        return;
+      }
+
       if (isImportedEntryNewer(normalized, sameId)) {
         Object.assign(sameId, normalized);
       }
@@ -882,6 +989,10 @@ function mergeImportedEntries(incomingEntries) {
         sameContent.referenceImage = normalized.referenceImage;
         sameContent.updatedAt = normalized.updatedAt;
       }
+      if (!sameContent.frameImage && normalized.frameImage) {
+        sameContent.frameImage = normalized.frameImage;
+        sameContent.updatedAt = normalized.updatedAt;
+      }
       merged += 1;
       byId.set(sameContent.id, sameContent);
       return;
@@ -894,6 +1005,183 @@ function mergeImportedEntries(incomingEntries) {
   });
 
   return { added, merged };
+}
+
+function findImportDuplicateIssues(incomingEntries) {
+  const issues = [];
+
+  incomingEntries.forEach((incoming, importIndex) => {
+    const matches = state.entries
+      .map((existing) => classifyDuplicateIssue(existing, incoming))
+      .filter(Boolean)
+      .sort((left, right) => right.score - left.score);
+
+    if (!matches.length) return;
+    issues.push({
+      importIndex,
+      incoming,
+      match: matches[0],
+    });
+  });
+
+  return issues.sort((left, right) => right.match.score - left.match.score);
+}
+
+function classifyDuplicateIssue(existing, incoming) {
+  const exactContent = getEntryContentKey(existing) === getEntryContentKey(incoming);
+  if (exactContent) {
+    return {
+      existing,
+      level: "duplicate",
+      label: "完全重复",
+      reason: "时间轴、类型和内容一致",
+      score: 100,
+    };
+  }
+
+  const bothFullVideo = isFullVideoEntry(existing) && isFullVideoEntry(incoming);
+  const existingTime = getEntryComparableTime(existing);
+  const incomingTime = getEntryComparableTime(incoming);
+  const timeGap = Number.isFinite(existingTime) && Number.isFinite(incomingTime) ? Math.abs(existingTime - incomingTime) : Number.POSITIVE_INFINITY;
+  const timeClose = timeGap <= 3;
+  const timeNearby = timeGap <= 8;
+  const similarity = getTextSimilarity(existing.note, incoming.note);
+  const intentOverlap = getIntentOverlap(existing, incoming);
+  const incomingTypes = getTypeSet(incoming.type);
+  const sameType = getTypeSet(existing.type).some((type) => type !== "修改" && incomingTypes.includes(type));
+
+  if ((timeClose || bothFullVideo) && (similarity >= 0.5 || intentOverlap >= 1 || sameType)) {
+    return {
+      existing,
+      level: "suspected",
+      label: "疑似重复",
+      reason: bothFullVideo ? "同为全片意见，修改意图接近" : `时间相差 ${Math.round(timeGap)} 秒，修改意图接近`,
+      score: 75 + Math.min(20, Math.round(similarity * 20)) + intentOverlap,
+    };
+  }
+
+  if (timeClose) {
+    return {
+      existing,
+      level: "same-time",
+      label: "同时间点不同意见",
+      reason: `时间相差 ${Math.round(timeGap)} 秒，但内容方向不完全一致`,
+      score: 50,
+    };
+  }
+
+  if ((timeNearby || bothFullVideo) && similarity >= 0.65) {
+    return {
+      existing,
+      level: "suspected",
+      label: "疑似重复",
+      reason: bothFullVideo ? "同为全片意见，文字相似" : `时间相近，文字相似度较高`,
+      score: 68,
+    };
+  }
+
+  return null;
+}
+
+function getEntryComparableTime(entry) {
+  if (isFullVideoEntry(entry)) return -1;
+  if (Number.isFinite(entry.sortValue)) return entry.sortValue;
+  return getSortValue(entry.timecode);
+}
+
+function getIntentOverlap(left, right) {
+  const leftIntents = getIntentSet(left);
+  const rightIntents = getIntentSet(right);
+  return [...leftIntents].filter((intent) => rightIntents.has(intent)).length;
+}
+
+function getIntentSet(entry) {
+  const text = `${entry.type || ""} ${entry.note || ""}`;
+  const intentRules = [
+    ["节奏", ["节奏", "慢", "拖", "压缩", "剪短", "快一点", "紧凑"]],
+    ["删除", ["删除", "删掉", "去掉", "不用", "不要", "撤掉"]],
+    ["保留", ["保留", "别删", "加回来", "恢复", "留着"]],
+    ["字幕", ["字幕", "错字", "标题", "花字", "文案", "字体"]],
+    ["声音", ["声音", "音量", "音乐", "BGM", "bgm", "杂音", "降噪"]],
+    ["画面", ["画面", "镜头", "构图", "调色", "颜色", "亮", "暗", "素材"]],
+  ];
+  return new Set(intentRules.filter(([, words]) => words.some((word) => text.includes(word))).map(([label]) => label));
+}
+
+function getTypeSet(type) {
+  return String(type || "")
+    .split("/")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function showDuplicateImportReview(fileName, incomingEntries, issues) {
+  const duplicateIndexes = new Set(issues.filter((issue) => issue.match.level !== "same-time").map((issue) => issue.importIndex));
+  state.pendingImport = {
+    incomingEntries,
+    issues,
+    duplicateIndexes,
+  };
+
+  const visibleIssues = issues.slice(0, 8);
+  elements.duplicateReviewSummary.textContent = `${fileName} 中有 ${issues.length} 条需要确认，其中 ${duplicateIndexes.size} 条可选择跳过。`;
+  elements.duplicateReviewList.innerHTML = visibleIssues
+    .map((issue) => renderDuplicateIssue(issue))
+    .join("");
+
+  if (issues.length > visibleIssues.length) {
+    elements.duplicateReviewList.insertAdjacentHTML("beforeend", `<div class="duplicate-review-more">还有 ${issues.length - visibleIssues.length} 条未展开，选择后会一起处理。</div>`);
+  }
+
+  elements.duplicateReview.hidden = false;
+  document.body.classList.add("is-reviewing-import");
+}
+
+function renderDuplicateIssue(issue) {
+  return `
+    <div class="duplicate-review-item ${issue.match.level}">
+      <div class="duplicate-review-badge">${escapeHtml(issue.match.label)}</div>
+      <div class="duplicate-review-reason">${escapeHtml(issue.match.reason)}</div>
+      <div class="duplicate-review-pair">
+        <div>
+          <strong>已有</strong>
+          <span>${escapeHtml(issue.match.existing.timecode)}</span>
+          <p>${escapeHtml(issue.match.existing.note)}</p>
+        </div>
+        <div>
+          <strong>导入</strong>
+          <span>${escapeHtml(issue.incoming.timecode)}</span>
+          <p>${escapeHtml(issue.incoming.note)}</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function confirmPendingImport(options) {
+  if (!state.pendingImport) return;
+  const skippedIndexes = options.skipDuplicates ? state.pendingImport.duplicateIndexes : new Set();
+  const skipped = skippedIndexes.size;
+  const incomingEntries = state.pendingImport.incomingEntries;
+  const result = mergeImportedEntries(incomingEntries.filter((entry, index) => !skippedIndexes.has(index)));
+  markNeedsExport(state.entries.length > 0);
+  saveEntries();
+  resetForm({ focusTime: false });
+  render();
+  hideDuplicateImportReview();
+  showToast(`已导入 ${result.added} 条，合并 ${result.merged} 条${skipped ? `，跳过 ${skipped} 条` : ""}`);
+}
+
+function cancelPendingImport() {
+  hideDuplicateImportReview();
+  showToast("已取消导入");
+}
+
+function hideDuplicateImportReview() {
+  state.pendingImport = null;
+  elements.duplicateReview.hidden = true;
+  elements.duplicateReviewList.innerHTML = "";
+  document.body.classList.remove("is-reviewing-import");
 }
 
 function normalizeImportedEntry(entry, index) {
@@ -911,6 +1199,7 @@ function normalizeImportedEntry(entry, index) {
     type,
     note,
     referenceImage: entry.referenceImage ? String(entry.referenceImage) : null,
+    frameImage: entry.frameImage ? String(entry.frameImage) : null,
     sortValue: getSortValue(timecode),
     createdAt: entry.createdAt || now,
     updatedAt: entry.updatedAt || entry.createdAt || now,
@@ -933,7 +1222,7 @@ async function downloadJpg() {
   try {
     const entries = getSortedEntries();
     if (!entries.length) return;
-    const imageCount = entries.filter((entry) => entry.referenceImage).length;
+    const imageCount = entries.filter((entry) => getEntryImageSource(entry)).length;
     if (entries.length > 12 || imageCount >= 6) {
       showToast("正在生成总览图");
       const canvas = await createOverviewCanvas(entries, imageCount >= 6);
@@ -989,7 +1278,7 @@ async function createOverviewCanvas(entries, imageFocused = false) {
     type: '800 20px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
     note: '800 27px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
   };
-  const images = await Promise.all(entries.map((entry) => loadReferenceImage(entry.referenceImage)));
+  const images = await Promise.all(entries.map((entry) => loadReferenceImage(getEntryImageSource(entry))));
 
   const canvas = document.createElement("canvas");
   canvas.width = width * scale;
@@ -1141,13 +1430,167 @@ async function downloadPdf() {
   try {
     const entries = getSortedEntries();
     if (!entries.length) return;
+    const exportName = requestExportName("导出给剪辑看");
+    if (!exportName) return;
     showToast("正在生成 PDF");
     const pdfBytes = await createPdfFromEntries(entries);
-    downloadBlob(pdfBytes, `修改意见_${getDateStamp()}.pdf`, "application/pdf");
+    downloadBlob(pdfBytes, `${exportName}.pdf`, "application/pdf");
+    markExported();
   } catch (error) {
     console.error(error);
     showToast("生成 PDF 失败，请重试");
   }
+}
+
+function downloadJiaYuanScript() {
+  const markers = [];
+  getJiaYuanExportEntries(getSortedEntries()).forEach((entry) => {
+    const marker = createResolveMarkerPayload(entry, markers.length);
+    if (marker) markers.push(marker);
+  });
+  if (!markers.length) {
+    showToast("没有可导出的时间轴");
+    return;
+  }
+  const exportName = requestExportName("导出给嘉园");
+  if (!exportName) return;
+  const payload = {
+    version: 2,
+    type: "timeline-feedback-resolve-markers",
+    exportedAt: new Date().toISOString(),
+    markers,
+  };
+  downloadBlob(JSON.stringify(payload, null, 2), `${exportName}.json`, "application/json;charset=utf-8");
+  markExported();
+  showToast("已导出给嘉园的数据文件");
+}
+
+function getJiaYuanExportEntries(entries) {
+  const fullVideoEntries = entries.filter(isFullVideoEntry);
+  const timedEntries = entries.filter((entry) => !isFullVideoEntry(entry));
+  if (!fullVideoEntries.length) return timedEntries;
+
+  const now = new Date().toISOString();
+  const mergedNote = fullVideoEntries
+    .map((entry, index) => {
+      const note = getEntryNoteText(entry);
+      const type = entry.type && entry.type !== "修改" ? `（${entry.type}）` : "";
+      return note ? `${index + 1}. ${type}${note}` : "";
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  return [
+    {
+      id: "merged-full-video",
+      order: 0,
+      timecode: "00:00",
+      type: "全片修改",
+      note: mergedNote || "全片修改",
+      sortValue: 0,
+      createdAt: fullVideoEntries[0]?.createdAt || now,
+      updatedAt: now,
+    },
+    ...timedEntries,
+  ];
+}
+
+function isFullVideoEntry(entry) {
+  const timecode = String(entry?.timecode || "").trim();
+  return !timecode || timecode === "全片" || timecode === "未指定";
+}
+
+function markNeedsExport(nextValue = true) {
+  state.hasPendingExport = Boolean(nextValue && state.entries.length);
+}
+
+function markExported() {
+  state.hasPendingExport = false;
+}
+
+function handleBeforeUnload(event) {
+  if (!state.hasPendingExport || !state.entries.length) return;
+  event.preventDefault();
+  event.returnValue = "当前修改意见还没有导出，刷新后会被清空。请先导出意见。";
+}
+
+function requestExportName(actionLabel) {
+  const input = window.prompt(`${actionLabel}\n\n请输入这次修改意见名称。\n只需要填写名字本体，系统会自动补上“修改意见”。`, "未命名");
+  if (input === null) return null;
+  const name = String(input).trim() || "未命名";
+  const safeName = sanitizeFilename(`${name}修改意见`);
+  return safeName || `未命名修改意见_${getDateStamp()}`;
+}
+
+function sanitizeFilename(name) {
+  return String(name || "")
+    .replace(/[\\\\/:*?\"<>|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function createResolveMarkerPayload(entry, index) {
+  const range = getMarkerRange(entry);
+  if (!range) return null;
+  const number = String(index + 1).padStart(2, "0");
+  const durationSeconds = Math.max(1, Math.round(range.end - range.start));
+  const type = entry.type || "修改";
+  const noteText = getEntryNoteText(entry);
+  const titleText = noteText ? `${number} ${type}｜${truncateMarkerText(noteText, 36)}` : `${number} ${type}`;
+  return {
+    startSeconds: Math.max(0, range.start),
+    durationSeconds,
+    color: getResolveMarkerColor(type),
+    name: titleText,
+    note: getResolveMarkerNote(entry, type, noteText),
+    comment: noteText,
+    comments: noteText,
+    notes: noteText,
+    remarks: noteText,
+    memo: noteText,
+    description: noteText,
+    text: noteText,
+    content: noteText,
+    markerNote: noteText,
+    customData: `timeline_feedback_${entry.id || index}`,
+  };
+}
+
+function getResolveMarkerNote(entry, type, noteText) {
+  return [`修改意见：${noteText || "（无正文）"}`, "", `时间轴：${entry.timecode}`, `类型：${type}`].join("\n");
+}
+
+function getEntryNoteText(entry) {
+  return String(entry?.note || entry?.comment || entry?.text || entry?.content || entry?.description || "").trim();
+}
+
+function truncateMarkerText(text, maxLength) {
+  const chars = Array.from(String(text).replace(/\s+/g, " ").trim());
+  if (chars.length <= maxLength) return chars.join("");
+  return `${chars.slice(0, maxLength).join("")}...`;
+}
+
+function getMarkerRange(entry) {
+  if (!entry || entry.timecode === "全片" || entry.timecode === "未指定") return null;
+  const raw = String(entry.timecode || "").trim();
+  const parts = raw.split(/\s*(?:-|—|–|到|至|~)\s*/).filter(Boolean);
+  const start = timecodeToSeconds(parts[0]);
+  if (!Number.isFinite(start)) return null;
+  const explicitEnd = parts.length > 1 ? timecodeToSeconds(parts[1]) : Number.NaN;
+  const end = Number.isFinite(explicitEnd) && explicitEnd > start ? explicitEnd : start + 1;
+  return { start: Math.max(0, start), end: Math.max(start + 1, end) };
+}
+
+function getResolveMarkerColor(type) {
+  const text = String(type || "");
+  if (text.includes("删除")) return "Red";
+  if (text.includes("花字") || text.includes("包装")) return "Purple";
+  if (text.includes("字幕")) return "Cyan";
+  if (text.includes("素材")) return "Green";
+  if (text.includes("美颜")) return "Pink";
+  if (text.includes("画面")) return "Yellow";
+  if (text.includes("结构")) return "Orange";
+  return "Blue";
 }
 
 async function createPdfFromEntries(entries) {
@@ -1210,7 +1653,7 @@ async function prepareExportCards(entries, layout) {
   const measureCanvas = document.createElement("canvas");
   const measureCtx = measureCanvas.getContext("2d");
   measureCtx.font = fonts.note;
-  const loadedImages = await Promise.all(entries.map((entry) => loadReferenceImage(entry.referenceImage)));
+  const loadedImages = await Promise.all(entries.map((entry) => loadReferenceImage(getEntryImageSource(entry))));
   return entries.map((entry, index) => {
     const image = loadedImages[index];
     const isPortraitImage = image && getImageRatio(image) > 1.12;
@@ -1325,7 +1768,7 @@ async function createImageCanvas(entries) {
   const measureCanvas = document.createElement("canvas");
   const measureCtx = measureCanvas.getContext("2d");
   measureCtx.font = fonts.note;
-  const loadedImages = await Promise.all(entries.map((entry) => loadReferenceImage(entry.referenceImage)));
+  const loadedImages = await Promise.all(entries.map((entry) => loadReferenceImage(getEntryImageSource(entry))));
   const cards = entries.map((entry, index) => {
     const image = loadedImages[index];
     const isPortraitImage = image && getImageRatio(image) > 1.12;
@@ -1690,27 +2133,14 @@ function escapeHtml(value) {
 }
 
 function saveEntries() {
-  try {
-    localStorage.setItem("timeline-note-entries", JSON.stringify(state.entries));
-  } catch {
-    // 浏览器禁用本地存储时，仍然允许本次页面内继续使用。
-  }
+  // 当前版本不做跨次打开持久化，意见只保留在本次页面会话里。
 }
 
 function loadEntries() {
   try {
-    return JSON.parse(localStorage.getItem("timeline-note-entries") || "[]").map((entry, index) => {
-      const timecode = normalizeStoredTimecode(entry.timecode || "未指定");
-      return {
-        ...entry,
-        timecode,
-        order: entry.order ?? Date.now() + index,
-        sortValue: getSortValue(timecode),
-        createdAt: entry.createdAt || null,
-        updatedAt: entry.updatedAt || entry.createdAt || null,
-      };
-    });
+    localStorage.removeItem("timeline-note-entries");
   } catch {
-    return [];
+    // 忽略本地存储不可用或旧缓存清理失败。
   }
+  return [];
 }

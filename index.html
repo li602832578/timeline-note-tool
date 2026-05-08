@@ -3,32 +3,38 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>视频修改意见生成器</title>
+    <title>QitongFlow - 视频反馈工具</title>
     <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./overrides.css" />
   </head>
   <body>
-    <main class="app-shell">
+    <main class="app-shell intro-mode" id="appShell">
       <header class="topbar">
         <div class="brand">
-          <div class="brand-logo" aria-hidden="true">▶</div>
+          <div class="brand-mark" aria-hidden="true"><span></span></div>
           <div class="brand-copy">
-            <h1>视频修改意见生成器</h1>
-            <p>录入时间轴和修改意见，一键导出给剪辑看。</p>
+            <h1>QitongFlow</h1>
+            <p>给剪辑师更清晰的反馈</p>
           </div>
-          <div class="highlight-note">今天你给 Judy 投票了吗</div>
         </div>
+        <div class="highlight-note">今天你给 Judy 投票了吗</div>
         <div class="top-actions">
           <button class="button primary" id="downloadPdfButton" type="button">导出给剪辑看</button>
+          <button class="button secondary" id="downloadJiaYuanButton" type="button">导出给嘉园</button>
         </div>
       </header>
 
-      <section class="workspace" id="workspace">
+      <section class="workspace intro" id="workspace">
         <section class="video-locator" id="videoLocator">
           <div class="video-stage video-dropzone" id="videoDropzone">
             <input id="videoInput" type="file" accept="video/*" />
             <div class="video-empty" id="videoEmptyState">
-              <label class="video-empty-button" for="videoInput">导入视频</label>
-              <div class="video-empty-text">支持拖拽视频到这里</div>
+              <label class="video-empty-card" for="videoInput">
+                <img class="upload-icon-img" src="./file-upload.svg" alt="" aria-hidden="true" />
+                <strong>导入视频</strong>
+                <em>拖拽视频到这里，或点击导入</em>
+                <small>支持 MP4 / MOV 等常见格式</small>
+              </label>
             </div>
             <div class="video-display" id="videoDisplay" hidden>
               <video id="sourceVideo" playsinline></video>
@@ -38,51 +44,28 @@
             <div class="player-strip">
               <button class="play-toggle" id="playToggleButton" type="button" aria-label="播放" data-playing="false"></button>
               <span class="strip-time" id="stripCurrentTime">00:00</span>
-              <input id="videoScrubber" class="video-scrubber" type="range" min="0" max="1000" value="0" step="1" aria-label="视频进度条" />
+              <div class="scrubber-wrap">
+                <input id="videoScrubber" class="video-scrubber" type="range" min="0" max="1000" value="0" step="1" aria-label="视频进度条" />
+                <div class="range-visual" id="rangeVisual" hidden>
+                  <div class="range-fill" id="rangeFill"></div>
+                  <div class="range-marker start" id="rangeStartMarker"></div>
+                  <div class="range-marker end" id="rangeEndMarker"></div>
+                  <div class="range-bubble" id="rangeBubble"></div>
+                </div>
+              </div>
               <span class="strip-time" id="stripDuration">00:00</span>
               <button class="speed-toggle" id="speedToggleButton" type="button">1x</button>
             </div>
             <div class="precise-controls">
-              <div class="precise-head">
-                <span>精确定位</span>
-              <div class="jump-time">
-                <input id="jumpTimeInput" autocomplete="off" placeholder="如 0123、01:23" />
-                <button class="button ghost" id="jumpTimeButton" type="button">跳转</button>
-              </div>
-            </div>
               <div class="nudge-actions">
-                <button class="button ghost" type="button" data-nudge="-5">-5秒</button>
-                <button class="button ghost" type="button" data-nudge="-1">-1秒</button>
-                <button class="button ghost" type="button" data-nudge="1">+1秒</button>
-                <button class="button ghost" type="button" data-nudge="5">+5秒</button>
+                <button class="button ghost" type="button" data-nudge="-5">后退 5 秒</button>
+                <button class="button ghost" type="button" data-nudge="-1">后退 1 秒</button>
+                <button class="button ghost" id="setRangeStartButton" type="button">标记开始</button>
+                <button class="button ghost" id="setRangeEndButton" type="button">标记结束</button>
+                <button class="button ghost nudge-forward" type="button" data-nudge="1">前进 1 秒</button>
+                <button class="button ghost nudge-forward" type="button" data-nudge="5">前进 5 秒</button>
               </div>
             </div>
-            <div class="range-selector">
-              <div class="range-head">
-                <span>修改一整段时间</span>
-                <strong id="selectedRangeLabel">还没选这一段</strong>
-              </div>
-              <p class="range-help">如果这条意见不是某一秒，而是一整段视频，就用这里选时间段。</p>
-              <div class="range-status">
-                <span>
-                  <button class="range-time" id="rangeStartJumpButton" type="button">开始：<b id="rangeStartText">未选择</b></button>
-                  <button class="range-clear" id="clearRangeStartButton" type="button" aria-label="删除开始时间">删除</button>
-                </span>
-                <span>
-                  <button class="range-time" id="rangeEndJumpButton" type="button">结束：<b id="rangeEndText">未选择</b></button>
-                  <button class="range-clear" id="clearRangeEndButton" type="button" aria-label="删除结束时间">删除</button>
-                </span>
-              </div>
-              <div class="range-actions">
-                <button class="button ghost" id="setRangeStartButton" type="button">这段从这里开始</button>
-                <button class="button ghost" id="setRangeEndButton" type="button">这段到这里结束</button>
-                <button class="button secondary" id="applyRangeButton" type="button">填入这段时间</button>
-              </div>
-            </div>
-            <div class="video-meta">
-              <span>当前时间：<strong id="currentVideoTime">00:00</strong></span>
-            </div>
-            <small>拖动视频到需要修改的位置，时间轴会自动填入“录入意见”里。如需参考图，可在下方手动上传。</small>
           </div>
         </section>
 
@@ -91,34 +74,35 @@
             <div class="section-title">录入意见</div>
             <div class="section-tools">
               <label class="button ghost import-project-button" for="importProjectInput">
-                <span class="button-icon" aria-hidden="true">↓</span>
+                <img class="button-icon" src="./download.svg" alt="" aria-hidden="true" />
                 <span>导入意见</span>
               </label>
               <input id="importProjectInput" type="file" accept=".json,application/json" />
               <button class="button ghost" id="exportProjectButton" type="button">
-                <span class="button-icon" aria-hidden="true">↑</span>
+                <img class="button-icon" src="./up-right-from-square.svg" alt="" aria-hidden="true" />
                 <span>导出意见</span>
               </button>
             </div>
           </div>
-          <label class="field">
+          <div class="field time-field">
             <span>时间轴</span>
-              <input id="timeInput" autocomplete="off" placeholder="如 0123、01:23、0138-0200" />
-              <small>不填时间轴时，会默认识别为“全片”。</small>
-            </label>
+            <div class="time-input-wrap">
+              <input id="timeInput" autocomplete="off" placeholder="当前时间或片段会自动填入" />
+              <button class="button primary" id="submitButton" type="submit">添加一条</button>
+            </div>
+            <small>不填写时间时默认全片</small>
+          </div>
 
           <label class="field note-field">
             <div class="note-heading">
-              <span>修改意见</span>
               <div class="note-heading-actions">
                 <div class="status-toast" id="statusToast" role="status" aria-live="polite" hidden></div>
-                <button class="button primary" id="submitButton" type="submit">添加一条</button>
               </div>
             </div>
-            <textarea id="noteInput" rows="8" placeholder="直接输入修改意见。多行内容会保留换行。"></textarea>
+            <textarea id="noteInput" rows="8" placeholder="输入你想修改的地方，例如：这里节奏有点慢，可以剪短一点。"></textarea>
           </label>
 
-          <label class="field">
+          <label class="field type-field" hidden>
             <span>类型</span>
             <select id="typeInput">
               <option value="自动识别">自动识别</option>
@@ -134,10 +118,10 @@
           </label>
 
           <label class="field">
-            <span>参考图</span>
+            <span>参考图（可选）</span>
             <div class="file-picker">
               <label class="file-button" for="referenceImageInput">上传参考图</label>
-              <span id="referenceFileName">未选择图片</span>
+              <span id="referenceFileName">支持 JPG、PNG 格式</span>
               <input id="referenceImageInput" type="file" accept="image/*" />
             </div>
           </label>
@@ -145,15 +129,11 @@
             <img id="referencePreviewImage" alt="参考图预览" />
             <button class="button ghost" id="removeReferenceButton" type="button">删除参考图</button>
           </div>
-
-          <div class="form-actions">
-            <button class="button ghost" id="cancelEditButton" type="button" hidden>取消编辑</button>
-          </div>
         </form>
 
-        <section class="list-panel" aria-label="已添加修改意见">
+        <section class="list-panel" aria-label="修改意见汇总">
           <div class="panel-heading">
-            <h2>已添加</h2>
+            <h2>修改意见汇总</h2>
             <div class="panel-heading-actions">
               <span id="countLabel">0 条</span>
               <button class="button ghost" id="clearAllButton" type="button">清空</button>
@@ -163,6 +143,23 @@
         </section>
       </section>
     </main>
+
+    <div class="duplicate-review" id="duplicateReview" hidden>
+      <div class="duplicate-review-card" role="dialog" aria-modal="true" aria-labelledby="duplicateReviewTitle">
+        <div class="duplicate-review-head">
+          <div>
+            <h2 id="duplicateReviewTitle">发现可能重复的意见</h2>
+            <p id="duplicateReviewSummary">导入前请确认是否保留。</p>
+          </div>
+          <button class="duplicate-review-close" id="cancelImportButton" type="button" aria-label="取消导入">×</button>
+        </div>
+        <div class="duplicate-review-list" id="duplicateReviewList"></div>
+        <div class="duplicate-review-actions">
+          <button class="button ghost" id="skipDuplicatesButton" type="button">跳过疑似重复</button>
+          <button class="button primary" id="importAllButton" type="button">全部导入</button>
+        </div>
+      </div>
+    </div>
 
     <script src="./app.js"></script>
   </body>
