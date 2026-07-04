@@ -409,8 +409,35 @@ h3 {
 }
 
 .empty-icon {
-  color: var(--primary-strong);
-  font-size: 42px;
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border: 4px solid var(--primary-strong);
+  border-radius: 10px;
+}
+
+.empty-icon::before,
+.empty-icon::after,
+.empty-icon span {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--primary-strong);
+}
+
+.empty-icon::before {
+  top: 9px;
+}
+
+.empty-icon span {
+  top: 18px;
+}
+
+.empty-icon::after {
+  top: 27px;
 }
 
 .control-card {
@@ -433,6 +460,7 @@ h3 {
 }
 
 .play-button {
+  position: relative;
   display: grid;
   flex: 0 0 auto;
   width: 48px;
@@ -444,7 +472,25 @@ h3 {
   background: var(--mint);
   box-shadow: 0 10px 24px rgba(87, 127, 105, 0.10);
   cursor: pointer;
-  font-size: 20px;
+}
+
+.play-symbol {
+  width: 0;
+  height: 0;
+  margin-left: 4px;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 15px solid var(--text);
+}
+
+.play-button.is-playing .play-symbol {
+  width: 17px;
+  height: 21px;
+  margin-left: 0;
+  border: 0;
+  background:
+    linear-gradient(var(--text), var(--text)) left center / 6px 21px no-repeat,
+    linear-gradient(var(--text), var(--text)) right center / 6px 21px no-repeat;
 }
 
 .mono-time {
@@ -459,12 +505,58 @@ h3 {
 }
 
 .icon-button {
+  position: relative;
   width: 36px;
   height: 36px;
   border: 1px solid var(--stroke);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.80);
   cursor: pointer;
+}
+
+.speaker-symbol {
+  position: absolute;
+  left: 10px;
+  top: 13px;
+  width: 8px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--muted);
+}
+
+.speaker-symbol::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: -5px;
+  width: 0;
+  height: 0;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 12px solid var(--muted);
+}
+
+.speaker-symbol::after {
+  content: "";
+  position: absolute;
+  left: 19px;
+  top: -3px;
+  width: 8px;
+  height: 16px;
+  border: 2px solid var(--primary);
+  border-left: 0;
+  border-radius: 0 999px 999px 0;
+}
+
+.speaker-button.is-muted .speaker-symbol::after {
+  left: 18px;
+  top: -2px;
+  width: 2px;
+  height: 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #7a3d30;
+  transform: rotate(-42deg);
 }
 
 .volume-slider {

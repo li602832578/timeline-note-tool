@@ -176,13 +176,16 @@
     elements.playbackTime.textContent = `${currentTimecode()} / ${durationTimecode()}`
     elements.timelineLabel.textContent = `${currentTimecode()} / ${durationTimecode()}`
     elements.rangeLabel.textContent = rangeLabel()
-    elements.playButton.textContent = elements.video.paused ? '▶' : 'Ⅱ'
+    const isPaused = elements.video.paused
+    elements.playButton.classList.toggle('is-playing', !isPaused)
+    elements.playButton.setAttribute('aria-label', isPaused ? '播放' : '暂停')
     elements.timelineSlider.max = String(Math.max(0, state.duration))
     elements.timelineSlider.value = String(Math.min(state.currentTime, state.duration || state.currentTime))
     elements.timelineSlider.disabled = !state.videoUrl
     elements.emptyVideoState.style.display = state.videoUrl ? 'none' : 'grid'
     elements.video.classList.toggle('has-video', Boolean(state.videoUrl))
-    elements.muteButton.textContent = elements.video.muted ? '🔇' : '🔊'
+    elements.muteButton.classList.toggle('is-muted', elements.video.muted)
+    elements.muteButton.setAttribute('aria-label', elements.video.muted ? '取消静音' : '静音')
     elements.rateButton.textContent = `${elements.video.playbackRate || 1}x`
   }
 
