@@ -70,6 +70,18 @@
       }
     }
 
+    const compactTimecode = value.match(/^(?:([0-9]{2})([0-9]{2})([0-9]{2})([0-9]{2})|([0-9]{2})([0-9]{2})([0-9]{2})|([0-9]{2})([0-9]{2}))$/)
+    if (compactTimecode) {
+      const [, hoursWithFrames, minutesWithFrames, secondsWithFrames, frames, hours, minutes, seconds, compactMinutes, compactSeconds] = compactTimecode
+      if (hoursWithFrames) {
+        return parseTimecode(`${hoursWithFrames}:${minutesWithFrames}:${secondsWithFrames}:${frames}`, frameRate)
+      }
+      if (hours) {
+        return parseTimecode(`${hours}:${minutes}:${seconds}`, frameRate)
+      }
+      return parseTimecode(`${compactMinutes}:${compactSeconds}`, frameRate)
+    }
+
     const colonParts = value.split(':').map((part) => Number(part))
     if (colonParts.length === 4 && colonParts.every(Number.isFinite)) {
       const [hours, minutes, seconds, frames] = colonParts
@@ -110,7 +122,7 @@
     const rows = []
     const unassignedLines = []
     let currentRow = null
-    const timePattern = '(?:\\d{1,2}:){1,3}\\d{1,2}'
+    const timePattern = '(?:(?:\\d{1,2}:){1,3}\\d{1,2}|\\d{8}|\\d{6}|\\d{4})'
     const rangePattern = new RegExp(`(${timePattern})\\s*(?:→|->|至|到|~|－|—|-)\\s*(${timePattern})`)
     const singlePattern = new RegExp(`(${timePattern})`)
 
