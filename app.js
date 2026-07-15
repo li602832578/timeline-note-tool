@@ -38,6 +38,7 @@
     deleteEntryButton: $('deleteEntryButton'),
     clearEntriesButton: $('clearEntriesButton'),
     dropZone: $('dropZone'),
+    videoPanel: document.querySelector('.video-panel'),
     video: $('reviewVideo'),
     emptyVideoState: $('emptyVideoState'),
     videoInput: $('videoInput'),
@@ -184,6 +185,16 @@
     elements.timelineSlider.disabled = !state.videoUrl
     elements.emptyVideoState.style.display = state.videoUrl ? 'none' : 'grid'
     elements.video.classList.toggle('has-video', Boolean(state.videoUrl))
+    const isVerticalVideo = Boolean(
+      state.videoUrl &&
+      elements.video.videoWidth > 0 &&
+      elements.video.videoHeight > elements.video.videoWidth
+    )
+    elements.video.classList.toggle('is-vertical-video', isVerticalVideo)
+    elements.dropZone.classList.toggle('is-vertical-video', isVerticalVideo)
+    if (elements.videoPanel) {
+      elements.videoPanel.classList.toggle('is-vertical-video', isVerticalVideo)
+    }
     elements.muteButton.classList.toggle('is-muted', elements.video.muted)
     elements.muteButton.setAttribute('aria-label', elements.video.muted ? '取消静音' : '静音')
     elements.rateButton.textContent = `${elements.video.playbackRate || 1}x`

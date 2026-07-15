@@ -3,35 +3,34 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f8f5ee" />
     <title>QitongFlow Web</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="app-shell">
-      <header class="topbar">
-        <div>
-          <div class="brand-row">
-            <div class="app-icon">Q</div>
-            <div>
-              <h1>QitongFlow</h1>
-              <p id="projectSubtitle">未命名修改意见</p>
+          <header class="topbar app-header">
+            <div class="brand-row">
+              <div>
+                <div class="brand-heading">
+                  <h1>QitongFlow</h1>
+                  <span class="version-pill">v1.0 · build 9</span>
+                </div>
+                <p id="projectSubtitle">未命名修改意见</p>
+              </div>
             </div>
-          </div>
-        </div>
-        <div class="top-actions">
-          <span class="status-pill"><span></span><b id="statusText">审片工作台就绪</b></span>
-          <label class="button ghost">
-            <input id="importProjectInput" type="file" accept=".qtf,.json,application/json" hidden />
-            打开项目
-          </label>
-          <button id="saveProjectButton" class="button ghost" type="button">保存项目</button>
-          <button id="exportEditButton" class="button primary" type="button">导出给剪辑看</button>
-        </div>
-      </header>
+            <div class="top-actions">
+              <span class="status-pill"><span></span><b id="statusText">审片工作台就绪</b></span>
+              <button id="saveProjectButton" class="button primary" type="button">保存项目</button>
+              <label class="button ghost">
+                <input id="importProjectInput" type="file" accept=".qtf,.json,application/json" hidden />
+                打开项目
+              </label>
+              <button id="exportEditButton" class="button export" type="button">导出给剪辑看</button>
+            </div>
+          </header>
 
-      <main class="workbench">
-        <aside class="panel entry-list-panel">
+      <main class="workbench app-layout">
+        <aside class="panel entry-list-panel review-list-panel">
           <div class="panel-heading">
             <h2>意见列表</h2>
             <span id="entryCount">共 0 条</span>
@@ -44,108 +43,123 @@
           </div>
         </aside>
 
-        <section class="center-stage">
-          <section class="panel video-panel">
-            <div class="panel-heading">
-              <div>
-                <h2>视频审片</h2>
-                <p id="currentFrameLabel">当前帧 --:--:--:--</p>
+        <section class="workspace">
+          <section class="center-stage review-stage">
+            <section class="panel video-panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>视频审片</h2>
+                  <p id="currentFrameLabel">当前帧 --:--:--:--</p>
+                </div>
               </div>
+
+              <div id="dropZone" class="video-drop-zone">
+                <video id="reviewVideo" playsinline></video>
+                <div id="emptyVideoState" class="empty-video">
+                  <strong>导入或拖入 MP4 / MOV 视频</strong>
+                  <label class="button primary">
+                    <input id="videoInput" type="file" accept="video/mp4,video/quicktime,video/*" hidden />
+                    选择视频
+                  </label>
+                </div>
+              </div>
+
+              <div class="control-card controlbar">
+                <div class="playback-row">
+                  <button id="playButton" class="play-button" type="button" aria-label="播放">
+                    <svg class="player-icon icon-play lucide-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M8 5.5v13l10-6.5-10-6.5Z" />
+                    </svg>
+                    <svg class="player-icon icon-pause lucide-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M9 6v12" />
+                      <path d="M15 6v12" />
+                    </svg>
+                  </button>
+                  <span id="playbackTime" class="mono-time">--:--:--:-- / --:--:--:--</span>
+                  <div class="volume-group">
+                    <button id="muteButton" class="icon-button speaker-button" type="button" aria-label="静音">
+                      <svg class="volume-icon icon-volume lucide-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M11 5 6.6 9H3.5v6h3.1L11 19V5Z" />
+                        <path d="M16 8.5a5 5 0 0 1 0 7" />
+                        <path d="M18.8 5.7a9 9 0 0 1 0 12.6" />
+                      </svg>
+                      <svg class="volume-icon icon-volume-x lucide-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M11 5 6.6 9H3.5v6h3.1L11 19V5Z" />
+                        <path d="M17 9 21 13" />
+                        <path d="M21 9 17 13" />
+                      </svg>
+                    </button>
+                    <input id="volumeSlider" class="volume-slider" type="range" min="0" max="1" step="0.01" value="1" />
+                    <button id="rateButton" class="button compact ghost" type="button">1x</button>
+                  </div>
+                </div>
+
+                <div class="range-meta">
+                  <div class="range-left">
+                    <span>区间标记</span>
+                    <b id="rangeLabel">--:--:--:-- → --:--:--:--</b>
+                  </div>
+                  <em id="timelineLabel">--:--:--:-- / --:--:--:--</em>
+                </div>
+                <input id="timelineSlider" class="timeline-slider" type="range" min="0" max="0" step="0.04" value="0" />
+
+                <div class="timeline-actions">
+                  <button id="markStartButton" class="button range-start" type="button">标记开始</button>
+                  <button id="markEndButton" class="button range-end" type="button">标记结束</button>
+                  <div class="nudge-group">
+                    <button class="button nudge" data-step="-5" type="button">-5秒</button>
+                    <button class="button nudge" data-step="-1" type="button">-1秒</button>
+                    <button class="button nudge" data-step="-frame" type="button">-1帧</button>
+                    <button class="button nudge" data-step="frame" type="button">+1帧</button>
+                    <button class="button nudge" data-step="1" type="button">+1秒</button>
+                    <button class="button nudge" data-step="5" type="button">+5秒</button>
+                  </div>
+                  <button id="clearRangeButton" class="button range-clear" type="button">清除</button>
+                </div>
+              </div>
+            </section>
+          </section>
+
+          <aside class="panel editor-panel comment-panel">
+            <div class="panel-heading">
+              <h2>当前意见</h2>
+              <button id="submitEntryButton" class="button primary" type="button">添加意见</button>
             </div>
 
-            <div id="dropZone" class="video-drop-zone">
-              <video id="reviewVideo" playsinline></video>
-              <div id="emptyVideoState" class="empty-video">
-                <div class="empty-icon" aria-hidden="true">
-                  <span></span>
-                </div>
-                <strong>导入或拖入 MP4 / MOV 视频</strong>
-                <span>导入后在这里审片、标记区间并添加修改意见</span>
-                <label class="button primary">
-                  <input id="videoInput" type="file" accept="video/mp4,video/quicktime,video/*" hidden />
-                  选择视频
+            <label class="field-label" for="timecodeInput">时间码</label>
+            <div class="timecode-field">
+              <input id="timecodeInput" class="field mono-time" placeholder="当前时间或片段会自动填入" />
+              <button id="wholeVideoButton" class="button compact ghost" type="button">全片</button>
+            </div>
+
+            <label class="field-label" for="noteInput">修改意见</label>
+            <textarea id="noteInput" class="field note-field" placeholder="输入给剪辑看的修改意见"></textarea>
+
+            <section class="annotation-box">
+              <h3>画面标注</h3>
+              <div id="referencePreview" class="reference-preview">没有参考图</div>
+              <div class="two-buttons">
+                <button id="captureFrameButton" class="button ghost" type="button">画示意图</button>
+                <label class="button ghost">
+                  <input id="referenceInput" type="file" accept="image/*" hidden />
+                  上传参考图
                 </label>
               </div>
-            </div>
+              <button id="removeReferenceButton" class="button compact danger" type="button" hidden>删除参考图</button>
+            </section>
 
-            <div class="control-card">
-              <div class="playback-row">
-                <button id="playButton" class="play-button" type="button" aria-label="播放">
-                  <span class="play-symbol" aria-hidden="true"></span>
-                </button>
-                <span id="playbackTime" class="mono-time">--:--:--:-- / --:--:--:--</span>
-                <div class="volume-group">
-                  <button id="muteButton" class="icon-button speaker-button" type="button" aria-label="静音">
-                    <span class="speaker-symbol" aria-hidden="true"></span>
-                  </button>
-                  <input id="volumeSlider" class="volume-slider" type="range" min="0" max="1" step="0.01" value="1" />
-                  <button id="rateButton" class="button compact ghost" type="button">1x</button>
-                </div>
+            <section class="helper-box">
+              <h3>辅助操作</h3>
+              <div class="two-buttons">
+                <button id="pasteTextButton" class="button compact ghost" type="button">粘贴文字意见</button>
+                <label class="button compact ghost">
+                  <input id="mergeProjectInput" type="file" accept=".qtf,.json,application/json" multiple hidden />
+                  导入 QTF 意见
+                </label>
               </div>
-
-              <div class="range-meta">
-                <span>区间标记</span>
-                <b id="rangeLabel">--:--:--:-- → --:--:--:--</b>
-                <em id="timelineLabel">--:--:--:-- / --:--:--:--</em>
-              </div>
-              <input id="timelineSlider" class="timeline-slider" type="range" min="0" max="0" step="0.04" value="0" />
-
-              <div class="timeline-actions">
-                <button id="markStartButton" class="button range-start" type="button">标记开始</button>
-                <button id="markEndButton" class="button range-end" type="button">标记结束</button>
-                <div class="nudge-group">
-                  <button class="button nudge" data-step="-5" type="button">-5秒</button>
-                  <button class="button nudge" data-step="-1" type="button">-1秒</button>
-                  <button class="button nudge" data-step="-frame" type="button">-1帧</button>
-                  <button class="button nudge" data-step="frame" type="button">+1帧</button>
-                  <button class="button nudge" data-step="1" type="button">+1秒</button>
-                  <button class="button nudge" data-step="5" type="button">+5秒</button>
-                </div>
-                <button id="clearRangeButton" class="button range-clear" type="button">清除</button>
-              </div>
-            </div>
-          </section>
+            </section>
+          </aside>
         </section>
-
-        <aside class="panel editor-panel">
-          <div class="panel-heading">
-            <h2>当前意见</h2>
-            <button id="submitEntryButton" class="button primary" type="button">添加意见</button>
-          </div>
-
-          <label class="field-label" for="timecodeInput">时间码</label>
-          <div class="timecode-field">
-            <input id="timecodeInput" class="field mono-time" placeholder="当前时间或片段会自动填入" />
-            <button id="wholeVideoButton" class="button compact ghost" type="button">全片</button>
-          </div>
-
-          <label class="field-label" for="noteInput">修改意见</label>
-          <textarea id="noteInput" class="field note-field" placeholder="输入给剪辑看的修改意见"></textarea>
-
-          <section class="annotation-box">
-            <h3>画面标注</h3>
-            <div id="referencePreview" class="reference-preview">没有参考图</div>
-            <div class="two-buttons">
-              <button id="captureFrameButton" class="button ghost" type="button">画示意图</button>
-              <label class="button ghost">
-                <input id="referenceInput" type="file" accept="image/*" hidden />
-                上传参考图
-              </label>
-            </div>
-            <button id="removeReferenceButton" class="button compact danger" type="button" hidden>删除参考图</button>
-          </section>
-
-          <section class="helper-box">
-            <h3>辅助操作</h3>
-            <div class="two-buttons">
-              <button id="pasteTextButton" class="button compact ghost" type="button">粘贴文字意见</button>
-              <label class="button compact ghost">
-                <input id="mergeProjectInput" type="file" accept=".qtf,.json,application/json" multiple hidden />
-                导入 QTF 意见
-              </label>
-            </div>
-          </section>
-        </aside>
       </main>
     </div>
 
