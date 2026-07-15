@@ -536,9 +536,20 @@
     elements.pasteTextButton.addEventListener('click', async () => {
       try {
         const text = await navigator.clipboard.readText()
-        state.draft.note = text
-        renderDraft()
-        setStatus('已粘贴文字意见')
+        const pastedEntries = core.parsePastedFeedback(text, FRAME_RATE)
+        const timedEntries = pastedEntries.filter((entry) => entry.timecode !== '全片')
+
+        if (!timedEntries.length) {
+          state.draft.note = text
+          renderDraft()
+          setStatus('未识别到时间码，已粘贴到修改意见')
+          return
+        }
+
+        state.project = core.addPastedFeedbackEntries(state.project, pastedEntries)
+        resetDraft()
+        setStatus(`已按时间码导入 ${pastedEntries.length} 条修改意见`)
+        render()
       } catch (error) {
         setStatus('浏览器没有允许读取剪贴板')
       }

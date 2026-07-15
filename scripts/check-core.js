@@ -34,4 +34,19 @@ const listImported = core.importProjectFromText(JSON.stringify([
 assert.strictEqual(listImported.entries[0].type, '字幕')
 assert.strictEqual(listImported.entries[0].timecode, '00:00:12:00')
 
+const pastedRows = core.parsePastedFeedback(`
+00:03 开场口播音量再稳一点
+00:00:12:10 - 00:00:15:00 字幕字距太近
+00:20
+这里口误的地方删除
+`)
+assert.strictEqual(pastedRows.length, 3)
+assert.strictEqual(pastedRows[0].timecode, '00:00:03:00')
+assert.strictEqual(pastedRows[1].timecode, '00:00:12:10 → 00:00:15:00')
+assert.strictEqual(pastedRows[2].note, '这里口误的地方删除')
+
+const pastedProject = core.addPastedFeedbackEntries(core.createProject('粘贴意见'), pastedRows)
+assert.strictEqual(pastedProject.entries.length, 3)
+assert.strictEqual(pastedProject.entries[1].timecode, '00:00:12:10 → 00:00:15:00')
+
 console.log('qitongflow web core ok')

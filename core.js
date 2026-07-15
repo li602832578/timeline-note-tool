@@ -60,6 +60,16 @@
       return { label: '全片', seconds: -1 }
     }
 
+    const rangeMatch = value.match(/^\s*((?:\d{1,2}:){1,3}\d{1,2})\s*(?:→|->|至|到|~|－|—|-)\s*((?:\d{1,2}:){1,3}\d{1,2})\s*$/)
+    if (rangeMatch) {
+      const start = parseTimecode(rangeMatch[1], frameRate)
+      const end = parseTimecode(rangeMatch[2], frameRate)
+      return {
+        label: `${start.label} → ${end.label}`,
+        seconds: start.seconds
+      }
+    }
+
     const colonParts = value.split(':').map((part) => Number(part))
     if (colonParts.length === 4 && colonParts.every(Number.isFinite)) {
       const [hours, minutes, seconds, frames] = colonParts
@@ -94,6 +104,56 @@
     }
 
     return { label: value, seconds: -1 }
+  }
+
+  function parsePastedFeedback(text, frameRate = DEFAULT_FRAME_RATE) {
+    const rows = []
+    const unassignedLines = []
+    let currentRow = null
+    const timePattern = '(?:\\d{1,2}:){1,3}\\d{1,2}'
+    const rangePattern = new RegExp(`(${timePattern})\\s*(?:→|->|至|到|~|－|—|-)\\s*(${timePattern})`)
+    const singlePattern = new RegExp(`(${timePattern})`)
+
+    String(text || '').replace(/\r/g, '').split('\n').forEach((rawLine) => {
+      const line = rawLine.trim()
+      if (!line) return
+
+      const rangeMatch = line.match(rangePattern)
+      const timeMatch = rangeMatch || line.match(singlePattern)
+      if (timeMatch) {
+        const timecode = rangeMatch
+          ? `${parseTimecode(rangeMatch[1], frameRate).label} → ${parseTimecode(rangeMatch[2], frameRate).label}`
+          : parseTimecode(timeMatch[1], frameRate).label
+        const note = line
+          .replace(rangeMatch ? rangeMatch[0] : timeMatch[0], '')
+          .replace(/^\s*[#\d]+[.、)）\-:]?\s*/, '')
+          .replace(/^\s*[-—:：|]\s*/, '')
+          .trim()
+        currentRow = { timecode, note }
+        rows.push(currentRow)
+        return
+      }
+
+      if (currentRow) {
+        currentRow.note = [currentRow.note, line].filter(Boolean).join('\n')
+      } else {
+        unassignedLines.push(line)
+      }
+    })
+
+    if (unassignedLines.length) {
+      rows.push({ timecode: '全片', note: unassignedLines.join('\n') })
+    }
+
+    return rows.filter((row) => row.note.trim())
+  }
+
+  function addPastedFeedbackEntries(project, rows) {
+    return (rows || []).reduce((nextProject, row) => addEntry(nextProject, {
+      timecode: row.timecode,
+      note: row.note,
+      type: row.type
+    }), project)
   }
 
   function detectFeedbackType(note, fallback = '修改') {
@@ -222,6 +282,7 @@
   return {
     PROJECT_SCHEMA,
     PROJECT_VERSION,
+    addPastedFeedbackEntries,
     addEntry,
     createProject,
     deleteEntry,
@@ -229,6 +290,7 @@
     exportProject,
     formatTimecode,
     importProjectFromText,
+    parsePastedFeedback,
     parseTimecode,
     sortEntries,
     updateEntry
